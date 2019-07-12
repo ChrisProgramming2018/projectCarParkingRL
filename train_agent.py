@@ -1,7 +1,7 @@
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
-
+import sys
 import base64
 import imageio
 import IPython
@@ -9,7 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import PIL.Image
 import tensorflow as tf
-
+import gym_bubbleshooter
 from tf_agents.agents.dqn import dqn_agent
 from tf_agents.drivers import dynamic_step_driver
 from tf_agents.environments import suite_gym
@@ -24,6 +24,7 @@ from tf_agents.utils import common
 tf.compat.v1.enable_v2_behavior()
 print("load env ..")
 env_name = 'CartPole-v0'  # @param
+env_name =("BubbleShooter-v0")
 num_iterations = 8000  # @param
 print("load env completed")
 
@@ -41,10 +42,9 @@ num_eval_episodes = 10  # @param
 eval_interval = 1000  # @param
 
 
-env = suite_gym.load(env_name)
+env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
 
 env.reset()
-
 
 print('Observation Spec:')
 print(env.time_step_spec().observation)
@@ -61,16 +61,28 @@ next_time_step = env.step(action)
 print('Next time step:')
 print(next_time_step)
 
-train_py_env = suite_gym.load(env_name)
-eval_py_env = suite_gym.load(env_name)
+train_py_env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
+eval_py_env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
 
 train_env = tf_py_environment.TFPyEnvironment(train_py_env)
 eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
+
+
+
+train_env.reset()
+print('Observation Spec:')
+print(train_env.time_step_spec().observation)
+
+
+
 
 q_net = q_network.QNetwork(
         train_env.observation_spec(),
         train_env.action_spec(),
         fc_layer_params=fc_layer_params)
+
+
+
 optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate)
 
 train_step_counter = tf.compat.v2.Variable(0)
@@ -84,6 +96,10 @@ tf_agent = dqn_agent.DqnAgent(
         train_step_counter=train_step_counter)
 
 tf_agent.initialize()
+
+print('end')
+sys.exit()
+
 eval_policy = tf_agent.policy
 collect_policy = tf_agent.collect_policy
 random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(), train_env.action_spec())
