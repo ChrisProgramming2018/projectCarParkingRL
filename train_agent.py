@@ -2,6 +2,17 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 import sys
+sys.path = ['',
+        '/home/leiningc/anaconda3/envs/sim/lib/python35.zip',
+        '/home/leiningc/anaconda3/envs/sim/lib/python3.5',
+        '/home/leiningc/anaconda3/envs/sim/lib/python3.5/plat-linux',
+        '/home/leiningc/anaconda3/envs/sim/lib/python3.5/lib-dynload',
+        '/home/leiningc/anaconda3/envs/sim/lib/python3.5/site-packages',
+        '/home/leiningc/anaconda3/envs/sim/lib/python3.5/site-packages/IPython/extensions',
+        '/home/leiningc/.ipython',
+        '/home/leiningc/project/gym_env/gym-bubbleshooter']
+
+print(sys.path)
 import base64
 import imageio
 import IPython
@@ -23,12 +34,13 @@ from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
 tf.compat.v1.enable_v2_behavior()
 print("load env ..")
-env_name = 'CartPole-v0'  # @param
+sys.exit()
 env_name =("BubbleShooter-v0")
 num_iterations = 8000  # @param
 print("load env completed")
 
-initial_collect_steps = 1000  # @param
+#initial_collect_steps = 1000  # @param
+initial_collect_steps = 10  # @param
 collect_steps_per_iteration = 1  # @param
 replay_buffer_capacity = 100000  # @param
 
@@ -60,7 +72,6 @@ action = 1
 next_time_step = env.step(action)
 print('Next time step:')
 print(next_time_step)
-
 train_py_env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
 eval_py_env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
 
@@ -72,7 +83,10 @@ eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 train_env.reset()
 print('Observation Spec:')
 print(train_env.time_step_spec().observation)
-
+print('board:')
+print("env")
+print(eval_env.reset())
+print('end')
 
 
 
@@ -97,12 +111,11 @@ tf_agent = dqn_agent.DqnAgent(
 
 tf_agent.initialize()
 
-print('end')
-sys.exit()
-
 eval_policy = tf_agent.policy
 collect_policy = tf_agent.collect_policy
 random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(), train_env.action_spec())
+print("policy")
+
 def compute_avg_return(environment, policy, num_episodes=10):
     total_return = 0.0
     for _ in range(num_episodes):
@@ -116,12 +129,19 @@ def compute_avg_return(environment, policy, num_episodes=10):
     avg_return = total_return / num_episodes
     return avg_return.numpy()[0]
 
-compute_avg_return(eval_env, random_policy, num_eval_episodes)
+print("compute_avg_return ... ")
+#compute_avg_return(eval_env, random_policy, num_eval_episodes)
+compute_avg_return(eval_env, random_policy, 5)
+
+
+
+
 replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
         data_spec=tf_agent.collect_data_spec, 
         batch_size=train_env.batch_size,
         max_length=replay_buffer_capacity)
 
+print(" init buffer ... ")
 def collect_step(environment, policy):
     time_step = environment.current_time_step()
     action_step = policy.action(time_step)
@@ -132,14 +152,15 @@ def collect_step(environment, policy):
 
 for _ in range(initial_collect_steps):
     collect_step(train_env, random_policy)
-
+print("collected")
 dataset = replay_buffer.as_dataset(
         num_parallel_calls=3, sample_batch_size=batch_size,
         num_steps=2).prefetch(3)
 
+print("dataset")
 iterator = iter(dataset)
 
-
+print("train")
 # (Optional) Optimize by wrapping some of the code in a graph using TF function.
 tf_agent.train = common.function(tf_agent.train)
 
