@@ -79,7 +79,7 @@ optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate)
 
 train_step_counter = tf.compat.v2.Variable(0)
 
-tf_agent = dqn_agent.DqnAgent(train_env.time_step_spec(),
+tf_agent = dqn_agent.DdqnAgent(train_env.time_step_spec(),
         train_env.action_spec(),
         q_network=q_net,
         optimizer=optimizer,
@@ -169,6 +169,9 @@ def collect_step(environment, policy, buffer):
         episode_reward += time_step.reward.numpy()[0]
         # Add trajectory to the replay buffer
         buffer.add_batch(traj)
+        # train 
+        experience, unused_info = next(iterator)    
+        train_loss = tf_agent.train(experience).loss
         time_step = next_time_step
         if time_step.is_last().numpy()[0] and step > 20:
             print("Finished after time step", step)
@@ -179,7 +182,8 @@ def collect_data(env, policy, buffer, steps):
         collect_step(env, policy, buffer)
 
 print("collect data  ...")
-collect_data(train_env, random_policy, replay_buffer, steps=1)
+data_collection_steps = 1
+collect_data(train_env, random_policy, replay_buffer, steps=data_collection_steps)
 
 
 print("create dataset")
@@ -235,7 +239,7 @@ def data_loger(start, num_greedy_actions, episode_reward, scores_window, eps):
     time_passed = time_passed
     minutes = time_passed / 60
     hours = time_passed / 3600
-    text = 'Episode: {}: reward: {:.0f} average reward: {:.0f}  eps: {:.2f} '
+    text = 'Episode: {}: reward: {:.0f} average reward: {:.0f}  eps: {:.3f} '
     text += 'greedy actions: {:.2f} time: {:.0f} h {:.0f} min {:.0f} sec '
     text= text.format(episode, episode_reward, np.mean(scores_window), eps, num_greedy_actions, hours, minutes % 60, time_passed % 60 )    
     return text
@@ -246,31 +250,31 @@ def write_into_file(text, file_name='document.csv'):
             fd.write(str(text)+"\n")
 
 
-def save_and_plot(num_iterations, returns, model_num=1):
-    os.system('mkdir -p results/model-{}'.format(model_num))
+def save_and_plot(num_iterations, returns, model=1):
+    os.system('mkdir -p results/model-{}'.format(model))
     fig = plt.figure()    
     fig.add_subplot(111)
-    iterations = range(0, num_iterations + 1, eval_interval)
+    iterations = range(0, len(returns))
     plt.plot(iterations, returns)
     plt.ylabel('Average Return')
     plt.xlabel('Iterations')
     plt.ylim(top=250)
-    plt.show()
-    plt.savefig('results/model-{}/scores.png'.format(model_num))
+    plt.savefig('results/model-1/scores-{}.png'.format(num_iterations))
     print("save plot")
 
 
-num_iterations = 20
-eval_interval = 10
+num_iterations = 20 * 1000
+eval_interval = 20
+save_weights_every = 100
 eps = 0.9
 eps_end = 0.05
-eps_decay = 0.99994  # reach 50 % at around 10k episodes
+eps_decay = 0.999  # reach 50 % at around 600 episodes
 
 for episode in range(num_iterations):
     step = tf_agent.train_step_counter.numpy()
     
     
-    if episode + 1 % save_weights_every  == 0:
+    if episode % save_weights_every  == 0:
         print("Save Networkweights")
         train_checkpointer.save(global_step=step)
     
@@ -281,8 +285,7 @@ for episode in range(num_iterations):
     # Sample a batch of data from the buffer and update the
     # agent's network.
     
-    experience, unused_info = next(iterator)
-        
+    experience, unused_info = next(iterator)    
     train_loss = tf_agent.train(experience).loss
 
     
@@ -295,6 +298,7 @@ for episode in range(num_iterations):
         text = text.format(episode, avg_return)
         print(text, end="\n")
         returns.append(avg_return)
+        save_and_plot(episode, returns)
     
     scores_window.append(episode_reward)
     text = data_loger(start, num_greedy_actions, episode_reward, scores_window,
