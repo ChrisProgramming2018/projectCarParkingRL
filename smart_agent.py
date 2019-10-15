@@ -32,6 +32,8 @@ import gym
 import gym_car
 import time
 
+print(dqn_agent.__file__)
+
 print("load env ..")
 env_name =("Car-v0")
 #env = gym.make("Car-v0")
@@ -94,6 +96,7 @@ def compute_avg_return(environment, policy, num_episodes=2):
             #time.sleep(1)
             time_step = environment.step(action_step.action.numpy()[0])
             episode_return += time_step.reward.numpy()[0]
+            print("current reward {}".format(time_step.reward.numpy()[0]))
         print("reward sum ", episode_return)
         total_return += episode_return
     avg_return = total_return / num_episodes

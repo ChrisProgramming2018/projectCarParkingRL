@@ -26,6 +26,8 @@ from tf_agents.policies import random_tf_policy
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
+from tf_agents.agents.categorical_dqn import categorical_dqn_agent
+from tf_agents.networks import categorical_q_network
 
 tf.compat.v1.enable_v2_behavior()
 import gym
@@ -41,24 +43,26 @@ env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
 
 
 
+
 start = time.time()
 num_iterations = 200000  # @param
 
-initial_collect_steps = 10000  # @param
+initial_collect_steps = 1000  # @param
 collect_steps_per_iteration = 1  # @param
-replay_buffer_max_length = 250000 
+replay_buffer_max_length = 10000 
 fc_layer_params = (512,)
 
 batch_size = 32  # @param
-learning_rate = 0.00005  # @param
+learning_rate = 0.00025  # @param
 log_interval = 200  # @param
 
 num_eval_episodes = 10  # @param
-eval_interval = 10  # @param
-repeat_training = 4
+eval_interval = 200  # @param
+
 
 train_py_env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
 eval_py_env = suite_gym.load(env_name, discount=0.99, max_episode_steps=1000)
+
 train_env = tf_py_environment.TFPyEnvironment(train_py_env)
 eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
 
@@ -67,7 +71,7 @@ print("env loaded")
 train_env.reset()
 
 
-q_net = q_network.QNetwork(
+q_net = categorical_q_network.CategoricalQNetwork(
         train_env.observation_spec(),
         train_env.action_spec(),
         fc_layer_params=fc_layer_params)
@@ -78,12 +82,12 @@ optimizer = tf.compat.v1.train.AdamOptimizer(learning_rate=learning_rate)
 
 train_step_counter = tf.compat.v2.Variable(0)
 
-tf_agent = dqn_agent.DdqnAgent(train_env.time_step_spec(),
+tf_agent = categorical_dqn_agent.CategoricalDqnAgent(train_env.time_step_spec(),
         train_env.action_spec(),
-        q_network=q_net,
+        categorical_q_network= q_net,
         optimizer=optimizer,
-        epsilon_greedy=1,
-        td_errors_loss_fn=dqn_agent.element_wise_squared_loss,
+        epsilon_greedy=0.9,
+        td_errors_loss_fn= common. element_wise_huber_loss,
         train_step_counter=train_step_counter)
 
 tf_agent.initialize()
@@ -126,6 +130,11 @@ replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
 
 tf_agent.collect_data_spec
 tf_agent.collect_data_spec._fields
+
+
+
+
+
 
 
 def collect_step(environment, policy, buffer):
@@ -194,20 +203,17 @@ tf_agent.train_step_counter.assign(0)
 num_eval_episodes = 1
 avg_return = compute_avg_return(eval_env, tf_agent.policy, num_eval_episodes)
 returns = [avg_return]
-returns_average = [avg_return]
-train_loss_average = [1]
+
+
 print("save")
 #FLAGS = flags.FLAGS
 #root_dir = FLAGS.root_dir
-
-root_dir = "/home/leiningc/b_project/gym_env/gym-car"
+root_dir = "/home/leiningc/project/data"
 root_dir = os.path.expanduser(root_dir)
-train_dir = os.path.join(root_dir, 'network_weights')
+train_dir = os.path.join(root_dir, 'parking')
 eval_dir = os.path.join(root_dir, 'eval')
-
 print("root_dir", root_dir)
 print("train_dir", train_dir)
-
 train_metrics = [
         tf_metrics.NumberOfEpisodes(),
         tf_metrics.EnvironmentSteps(),
@@ -230,14 +236,14 @@ start = time.time()
 save_weights_every = 100
 score = 0
 scores_window = deque(maxlen=100)       # last 100 scores
-total_train_loss = deque(maxlen=1000)       # last 100 scores
+
 def data_loger(start, num_greedy_actions, episode_reward, scores_window, eps):
     time_passed = time.time() - start
     time_passed = time_passed
     minutes = time_passed / 60
     hours = time_passed / 3600
     text = 'Episode: {}: reward: {:.0f} average reward: {:.0f}  eps: {:.3f} '
-    text += 'td_loss: {:.4f} time: {:.0f} h {:.0f} min {:.0f} sec '
+    text += 'greedy actions: {:.2f} time: {:.0f} h {:.0f} min {:.0f} sec '
     text= text.format(episode, episode_reward, np.mean(scores_window), eps, num_greedy_actions, hours, minutes % 60, time_passed % 60 )    
     return text
 
@@ -247,35 +253,26 @@ def write_into_file(text, file_name='document.csv'):
             fd.write(str(text)+"\n")
 
 
-def save_and_plot(num_iterations, returns_average, returns, td_loss, model=1):
+def save_and_plot(num_iterations, returns, model=1):
     os.system('mkdir -p results/model-{}'.format(model))
-    fig, ax = plt.subplots()
+    fig = plt.figure()    
+    fig.add_subplot(111)
     iterations = range(0, len(returns))
-    ax.plot(iterations, returns,'r--' ,label="return")
-    ax.plot(iterations, returns_average,'b', label='average')
-
-    
-    legend = ax.legend(loc='upper center', shadow=True, fontsize='x-large')
-    legend.get_frame().set_facecolor('C0')
+    plt.plot(iterations, returns)
     plt.ylabel('Average Return')
     plt.xlabel('Iterations')
-    plt.ylim(top=25)
+    plt.ylim(top=250)
     plt.savefig('results/model-1/scores-{}.png'.format(num_iterations))
-    fig, ax = plt.subplots()
-    ax.plot(iterations, td_loss, label='loss')
-    plt.ylabel('td_loss')
-    plt.xlabel('Iterations')
-    plt.ylim(top=1)
-    plt.savefig('results/model-1/loss-{}.png'.format(num_iterations))
     print("save plot")
 
 
 num_iterations = 20 * 1000
-eval_interval = 10
-save_weights_every = 10
-eps = 1
+eval_interval = 20
+save_weights_every = 100
+eps = 0.9
 eps_end = 0.05
-eps_decay = 0.9995  # reach 50 % at around 7000 episodes
+eps_decay = 0.999  # reach 50 % at around 600 episodes
+
 for episode in range(num_iterations):
     step = tf_agent.train_step_counter.numpy()
     
@@ -291,12 +288,8 @@ for episode in range(num_iterations):
     # Sample a batch of data from the buffer and update the
     # agent's network.
     
-    # train several times
-    for _ in range(repeat_training):
-        experience, unused_info = next(iterator)    
-        train_loss = tf_agent.train(experience).loss
-    scores_window.append(episode_reward)
-    total_train_loss.append(train_loss)
+    experience, unused_info = next(iterator)    
+    train_loss = tf_agent.train(experience).loss
 
     
     if episode + 1 % log_interval == 0:
@@ -308,11 +301,10 @@ for episode in range(num_iterations):
         text = text.format(episode, avg_return)
         print(text, end="\n")
         returns.append(avg_return)
-        returns_average.append(np.mean(scores_window))
-        train_loss_average.append(np.mean(total_train_loss))
-        save_and_plot(episode, returns_average, returns, train_loss_average)
+        save_and_plot(episode, returns)
     
-    text = data_loger(start, train_loss, episode_reward, np.mean(scores_window),
+    scores_window.append(episode_reward)
+    text = data_loger(start, num_greedy_actions, episode_reward, scores_window,
             tf_agent.collect_policy._get_epsilon())
     write_into_file(text)
     print(text, end="\r", flush=True)
