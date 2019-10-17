@@ -36,7 +36,7 @@ class CarEnv(gym.Env):
         self.max_step = 10  # steps to check if blocked 
         self.last_states = queue.deque(maxlen=self.max_step)        
         self.height = 70
-        self.width = 320
+        self.width = 320   # old 320 
         # self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
         self.observation_space = spaces.Box(0, 255, [self.height, self.width])
         self.debug_mode = False
@@ -109,19 +109,19 @@ class CarEnv(gym.Env):
         self.car_controls.brake = 0
         if action == 0:
             # go forward
-            self.car_controls.throttle = -0.5
+            self.car_controls.throttle = 0.5
             self.car_controls.steering = 0
             self.client.setCarControls(self.car_controls)
         
         if action == 1:
             # Go forward + steer right
-            self.car_controls.throttle = -0.5
+            self.car_controls.throttle = 0.5
             self.car_controls.steering = 1
             self.client.setCarControls(self.car_controls)
     
         if action == 2:
             # Go forward + steer left
-            self.car_controls.throttle = -0.5
+            self.car_controls.throttle = 0.5
             self.car_controls.steering = -1
             self.client.setCarControls(self.car_controls)
     
@@ -166,7 +166,8 @@ class CarEnv(gym.Env):
         reward = self._get_reward(pose)
         if self._is_goal(pose):
             self.goal_counter += 1
-            reward = 100
+            reward = 50
+            print("reached goal state: ", self.goal_counter)
         done = False
         state_exists = False
         for response in responses:
@@ -179,16 +180,16 @@ class CarEnv(gym.Env):
         if state_exists == False:
             self.counter_no_state +=1
             print("No state ", self.counter_no_state)
-            state = np.zeros((70, 320))
+            state = np.zeros((self.height, self.width))
         if self.debug_mode:
             debug_message = 'reward step:{:.2f}'.format(reward)
             print(debug_message, end='\r', flush=True) 
-            
+        reward /= 10
         return state, reward, done, pose
     
     def process_image(self, state):
         state =  cv2.cvtColor(state, cv2.COLOR_BGR2GRAY)
-        state = cv2.resize(state,(320,70))
+        state = cv2.resize(state,(self.width, self.height))
         # normailze (values between 0 and 1)
         state = state / 255
         return state
@@ -244,7 +245,7 @@ class CarEnv(gym.Env):
         x_r_dif = math.sqrt((x_rot - self.x_rot_goal)**2)
         y_r_dif = math.sqrt((y_rot - self.y_rot_goal)**2)
         z_r_dif = math.sqrt((z_rot - self.z_rot_goal)**2)
-        eps = 0.15
+        eps = 0.25
         if self.debug_mode:
             debug_message = '                                position difference of x: {:.2f}, '
             debug_message += 'y: {:.2f}, z: {:.2f}, x_r: '
