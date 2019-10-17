@@ -96,28 +96,10 @@ random_policy = random_tf_policy.RandomTFPolicy(train_env.time_step_spec(),
         train_env.action_spec())
 print("policy")
 
-def compute_avg_return(environment, policy, num_episodes=2):
-    total_return = 0.0
-    test = 0
-    for _ in range(num_episodes):
-        print("Episode", _)
-        test += 1
-        time_step = environment.reset()
-        episode_return = 0.0
-        #while not time_step.is_last():
-        for step in range(50):
-            action_step = policy.action(time_step)
-            #print("step:  ", step ,"action: ", action_step.action.numpy()[0])
-            #time.sleep(1)
-            time_step = environment.step(action_step.action.numpy()[0])
-            episode_return += time_step.reward.numpy()[0]
-        print("reward sum ", episode_return)
-        total_return += episode_return
-    avg_return = total_return / num_episodes
-    return avg_return
+from helper import compute_avg_return
 
-#print("compute_avg_return ... ")
-#compute_avg_return(eval_env, random_policy, num_eval_episodes)
+
+    return avg_return
 
 replay_buffer = tf_uniform_replay_buffer.TFUniformReplayBuffer(
         data_spec=tf_agent.collect_data_spec,
@@ -319,3 +301,47 @@ for episode in range(num_iterations):
     eps = max(eps_end, eps_decay*eps)
     tf_agent.collect_policy._epsilon = eps 
 save_and_plot(num_iterations, returns)
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--n_episodes', default=500)
+    parser.add_argument('--max_t', default=2000)
+    parser.add_argument('--eps_start', default=1.0)
+    parser.add_argument('--eps_end', default=0.01)
+    parser.add_argument('--eps_decay', default=0.990)
+    parser.add_argument('--buffer-size', default=1e5, type=int)
+    parser.add_argument('--batch-size', default=64, type=int)
+    parser.add_argument('--gamma', default=0.99)
+    parser.add_argument('--noise', default=False)
+    parser.add_argument('--tau', default=1e-3)
+    parser.add_argument('--lr', default=5e-4)
+    parser.add_argument('--update-every', default=4, type=int)
+    parser.add_argument('--seed', default=42, type=int)
+    parser.add_argument('--hidden_size_1', default=128)
+    parser.add_argument('--hidden_size_2', default=64, type=int)
+    parser.add_argument('--V-min', type=float, default=-10, metavar='V', help='Minimum of value distribution support')
+    parser.add_argument('--V-max', type=float, default=10, metavar='V', help='Maximum of value distribution support')
+    parser.add_argument('--atoms', type=int, default=51, metavar='C', help='Discretised size of value distribution')
+    parser.add_argument('--replay-frequency', type=int, default=10, metavar='k', help='Frequency of sampling from memory')
+    parser.add_argument('--noisy-std', type=float, default=0.1, metavar='sigma', help='Initial standard deviation of noisy linear layers')
+    parser.add_argument('--learn-start', type=int, default=int(800), metavar='STEPS', help='Number of steps before starting training')
+    parser.add_argument('--model', type=str, metavar='PARAMS', help='Pretrained model (state dict)')
+    parser.add_argument('--adam-eps', type=float, default=1e-8, metavar='eps', help='Adam epsilon')
+    parser.add_argument('--priority-exponent', type=float, default=0.0, metavar='omega', help='Prioritised experience replay exponent (originally denoted alpha)')
+    parser.add_argument('--priority-weight', type=float, default=0.8, metavar='beata', help='Initial prioritised experience replay importance sampling weight')
+    parser.add_argument('--evaluation-size', type=int, default=50000, metavar='N', help='Number of transitions to use for validating Q')
+    parser.add_argument('--history-length', type=int, default=1, metavar='T', help='Number of consecutive states processed')
+    parser.add_argument('--discount', type=float, default=0.99, metavar='gamma', help='Discount factor')
+    parser.add_argument('--multi-step', type=int, default=1, metavar='n', help='Number of steps for multi-step return')
+    parser.add_argument('--target-update', type=int, default=int(4), metavar='tau', help='Number of steps after which to update target network')
+    parser.add_argument('--reward-clip', type=int, default=0, metavar='VALUE', help='Reward clipping (0 to disable)')
+    parser.add_argument('--device', default="cpu", type=str)
+    parser.add_argument('--model_num', default=1)
+    arg = parser.parse_args()
+
+
+
+
+
+
+
