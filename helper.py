@@ -1,7 +1,10 @@
 """   """
+import os
+import time
 import numpy as np
+import matplotlib.pyplot as plt
+from collections import deque
 from tf_agents.trajectories import trajectory
-
 
 
 def collect_step(environment, policy, buffer, max_t):
@@ -46,7 +49,7 @@ def print_parameter(args, parser):
 
 
 
-def data_loger(start, episode_reward, scores_window, eps, td_loss):
+def data_loger(episode, start, episode_reward, scores_window, eps, td_loss):
     """
 
     """
@@ -92,6 +95,10 @@ def save_and_plot(num_iterations, returns_average, returns, td_loss, model=1):
 
 
 def compute_avg_return(environment, policy, num_episodes=2):
+    """
+
+
+    """
     total_return = 0.0
     test = 0
     for _ in range(num_episodes):
@@ -115,33 +122,42 @@ def compute_avg_return(environment, policy, num_episodes=2):
 
 
 
-def train(arg):
+def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_checkpointer):
     """
     
     """
+    print("start taining")
+    eps = arg.eps_start
+    returns = []
+    returns_average = []
+    train_loss_average = []
+    score = 0
+    scores_window = deque(maxlen=100)       # last 100 scores
+    total_train_loss = deque(maxlen=1000)       # last 100 scores
+    start = time.time()
     for episode in range(arg.n_episodes):
         step = tf_agent.train_step_counter.numpy()
         
-        if episode % save_weights_every  == 0:
+        if episode % arg.save_weights_every  == 0:
             print("Save Networkweights")
             train_checkpointer.save(global_step=step)
             
         # Collect a few steps using collect_policy and save to the replay buffer.
     
-        episode_reward = collect_step(train_env, tf_agent.collect_policy, replay_buffer)
+        episode_reward = collect_step(train_env, tf_agent.collect_policy, replay_buffer, arg.max_t)
         
         # Sample a batch of data from the buffer and update the
         # agent's network.
         
         # train several times
-        for _ in range(repeat_training):
+        for _ in range(arg.repeat_training):
             experience, unused_info = next(iterator)
             train_loss = tf_agent.train(experience).loss
         scores_window.append(episode_reward)
         total_train_loss.append(train_loss)
         
-        if episode % eval_interval == 0:
-            avg_return = compute_avg_return(eval_env, tf_agent.policy, num_eval_episodes)
+        if episode % arg.eval_interval == 0:
+            avg_return = compute_avg_return(eval_env, tf_agent.policy, arg.num_eval_episodes)
             text = 'Episode = {}: Average Return = {:.0f}'
             text = text.format(episode, avg_return)
             print(text, end="\n")
@@ -149,9 +165,9 @@ def train(arg):
             returns_average.append(np.mean(scores_window))
             train_loss_average.append(np.mean(total_train_loss))
             save_and_plot(episode, returns_average, returns, train_loss_average)
-        text = data_loger(start, train_loss, episode_reward, np.mean(scores_window),
+        text = data_loger(episode, start, train_loss, episode_reward, np.mean(scores_window),
                 tf_agent.collect_policy._get_epsilon())
         write_into_file(text)
         print(text, end="\r", flush=True)
-        eps = max(eps_end, eps_decay*eps)
+        eps = max(arg.eps_end, arg.eps_decay*eps)
         tf_agent.collect_policy._epsilon = eps

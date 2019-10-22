@@ -31,7 +31,7 @@ from tf_agents.utils import common
 tf.compat.v1.enable_v2_behavior()
 import gym
 import time
-from helper import collect_data, print_parameter, compute_avg_return
+from helper import collect_data, print_parameter, compute_avg_return, train
 
 def main(arg, pars):
     """
@@ -41,7 +41,6 @@ def main(arg, pars):
     print("load env ..")
     env_name =("CartPole-v0")
     #env = gym.make("Car-v0")
-    start = time.time()
     env = suite_gym.load(env_name, discount=arg.gamma, max_episode_steps=arg.max_t)
     print_parameter(arg, pars)
     train_py_env = suite_gym.load(env_name, discount=arg.gamma, max_episode_steps=arg.max_t)
@@ -98,7 +97,22 @@ def main(arg, pars):
     score = 0
     scores_window = deque(maxlen=100)       # last 100 scores
     total_train_loss = deque(maxlen=1000)       # last 100 scores
+    
+    train_metrics = [
+            tf_metrics.NumberOfEpisodes(),
+            tf_metrics.EnvironmentSteps(),
+            tf_metrics.AverageReturnMetric(),
+            tf_metrics.AverageEpisodeLengthMetric(),
+            ]
 
+    global_step = tf.compat.v1.train.get_or_create_global_step()
+    train_checkpointer = common.Checkpointer(
+            ckpt_dir=train_dir,
+            agent=tf_agent,
+            global_step=global_step,
+            metrics=metric_utils.MetricsGroup(train_metrics, 'train_metrics'))
+
+    train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_checkpointer) 
 
 
 
@@ -121,6 +135,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_episodes', default=500)
     parser.add_argument('--num_eval_episodes', default=1)
     parser.add_argument('--save_weights_every', default=100)
+    parser.add_argument('--eval_interval', default=100)
     parser.add_argument('--max_t', default=200)
     parser.add_argument('--eps_start', default=1.0)
     parser.add_argument('--eps_end', default=0.01)
@@ -130,7 +145,7 @@ if __name__ == "__main__":
     parser.add_argument('--gamma', default=0.99)
     parser.add_argument('--tau', default=1e-3)
     parser.add_argument('--lr', default=0.00005)
-    parser.add_argument('--update-every', default=4, type=int)
+    parser.add_argument('--repeat_training', default=4, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--hidden_size_1', default=512)
     parser.add_argument('--replay-frequency', type=int, default=10, metavar='k', help='Frequency of sampling from memory')
