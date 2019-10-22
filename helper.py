@@ -139,7 +139,7 @@ def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_che
         step = tf_agent.train_step_counter.numpy()
         
         if episode % arg.save_weights_every  == 0:
-            print("Save Networkweights")
+            print("Save Networkweights", end='\n')
             train_checkpointer.save(global_step=step)
             
         # Collect a few steps using collect_policy and save to the replay buffer.

@@ -48,7 +48,10 @@ def main(arg, pars):
     train_env = tf_py_environment.TFPyEnvironment(train_py_env)
     eval_env = tf_py_environment.TFPyEnvironment(eval_py_env)
     print("env loaded")
-    
+    if arg.continue_training == False:
+        # delete weights
+        if os.path.exists("network_weights/*"):
+            os.remove("network_weights/*")
     train_env.reset()
     fc_layer_params = (arg.hidden_size_1,)
     q_net = q_network.QNetwork(
@@ -142,6 +145,7 @@ if __name__ == "__main__":
     parser.add_argument('--eps_decay', default=0.990)
     parser.add_argument('--buffer-size', default=500000, type=int)
     parser.add_argument('--batch-size', default=64, type=int)
+    parser.add_argument('--continue_training', default=False, type=bool)
     parser.add_argument('--gamma', default=0.99)
     parser.add_argument('--tau', default=1e-3)
     parser.add_argument('--lr', default=0.00005)
