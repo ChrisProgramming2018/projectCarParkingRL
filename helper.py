@@ -46,42 +46,112 @@ def print_parameter(args, parser):
 
 
 
-def data_loger(start, num_greedy_actions, episode_reward, scores_window, eps):
+def data_loger(start, episode_reward, scores_window, eps, td_loss):
+    """
+
+    """
     time_passed = time.time() - start
     time_passed = time_passed
     minutes = time_passed / 60
     hours = time_passed / 3600
     text = 'Episode: {}: reward: {:.0f} average reward: {:.0f}  eps: {:.3f} '
     text += 'td_loss: {:.4f} time: {:.0f} h {:.0f} min {:.0f} sec '
-    text= text.format(episode, episode_reward, np.mean(scores_window), eps, num_greedy_actions, hours, minutes % 60, time_passed % 60 )
+    text= text.format(episode, episode_reward, np.mean(scores_window), eps, td_loss, hours, minutes % 60, time_passed % 60 )
     return text
 
 
 
 def write_into_file(text, file_name='document.csv'):
+    """
+    """
     with open(file_name,'a', newline='\n') as fd:
         fd.write(str(text)+"\n")
 
 
 def save_and_plot(num_iterations, returns_average, returns, td_loss, model=1):
+    """
+    """
     os.system('mkdir -p results/model-{}'.format(model))
     fig, ax = plt.subplots()
-238     iterations = range(0, len(returns))
-239     ax.plot(iterations, returns,'r--' ,label="return")
-240     ax.plot(iterations, returns_average,'b', label='average')
-241
-242
-243     legend = ax.legend(loc='upper center', shadow=True, fontsize='x-large')
-244     legend.get_frame().set_facecolor('C0')
-245     plt.ylabel('Average Return')
-246     plt.xlabel('Iterations')
-247     plt.ylim(top=25)
-248     plt.savefig('results/model-1/scores-{}.png'.format(num_iterations))
-249     fig, ax = plt.subplots()
-250     ax.plot(iterations, td_loss, label='loss')
-251     plt.ylabel('td_loss')
-252     plt.xlabel('Iterations')
-253     plt.ylim(top=1)
-254     plt.savefig('results/model-1/loss-{}.png'.format(num_iterations))
-255     print("save plot")
+    iterations = range(0, len(returns))
+    ax.plot(iterations, returns,'r--' ,label="return")
+    ax.plot(iterations, returns_average,'b', label='average')    
+    legend = ax.legend(loc='upper center', shadow=True, fontsize='x-large')
+    legend.get_frame().set_facecolor('C0')
+    plt.ylabel('Average Return')
+    plt.xlabel('Iterations')
+    plt.ylim(top=25)
+    plt.savefig('results/model-1/scores-{}.png'.format(num_iterations))
+    fig, ax = plt.subplots()
+    ax.plot(iterations, td_loss, label='loss')
+    plt.ylabel('td_loss')
+    plt.xlabel('Iterations')
+    plt.ylim(top=1)
+    plt.savefig('results/model-1/loss-{}.png'.format(num_iterations))
+    print("plot saved")
 
+
+def compute_avg_return(environment, policy, num_episodes=2):
+    total_return = 0.0
+    test = 0
+    for _ in range(num_episodes):
+        print("Episode", _)
+        test += 1
+        time_step = environment.reset()
+        episode_return = 0.0
+        #while not time_step.is_last():
+        for step in range(50):
+            action_step = policy.action(time_step)
+            #print("step:  ", step ,"action: ", action_step.action.numpy()[0])
+            #time.sleep(1)
+            time_step = environment.step(action_step.action.numpy()[0])
+            episode_return += time_step.reward.numpy()[0]
+        print("reward sum ", episode_return)
+        total_return += episode_return
+    avg_return = total_return / num_episodes
+    return avg_return
+
+
+
+
+
+def train(arg):
+    """
+    
+    """
+    for episode in range(arg.n_episodes):
+        step = tf_agent.train_step_counter.numpy()
+        
+        if episode % save_weights_every  == 0:
+            print("Save Networkweights")
+            train_checkpointer.save(global_step=step)
+            
+        # Collect a few steps using collect_policy and save to the replay buffer.
+    
+        episode_reward = collect_step(train_env, tf_agent.collect_policy, replay_buffer)
+        
+        # Sample a batch of data from the buffer and update the
+        # agent's network.
+        
+        # train several times
+        for _ in range(repeat_training):
+            experience, unused_info = next(iterator)
+            train_loss = tf_agent.train(experience).loss
+        scores_window.append(episode_reward)
+        total_train_loss.append(train_loss)
+        
+        if episode % eval_interval == 0:
+            avg_return = compute_avg_return(eval_env, tf_agent.policy, num_eval_episodes)
+            text = 'Episode = {}: Average Return = {:.0f}'
+            text = text.format(episode, avg_return)
+            print(text, end="\n")
+            returns.append(avg_return)
+            returns_average.append(np.mean(scores_window))
+            train_loss_average.append(np.mean(total_train_loss))
+            save_and_plot(episode, returns_average, returns, train_loss_average)
+        text = data_loger(start, train_loss, episode_reward, np.mean(scores_window),
+                tf_agent.collect_policy._get_epsilon())
+        write_into_file(text)
+        print(text, end="\r", flush=True)
+        eps = max(eps_end, eps_decay*eps)
+        tf_agent.collect_policy._epsilon = eps

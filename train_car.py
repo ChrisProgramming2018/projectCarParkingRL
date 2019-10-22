@@ -31,7 +31,7 @@ from tf_agents.utils import common
 tf.compat.v1.enable_v2_behavior()
 import gym
 import time
-from helper import collect_datai, print_parameter
+from helper import collect_data, print_parameter, compute_avg_return
 
 def main(arg, pars):
     """
@@ -41,7 +41,6 @@ def main(arg, pars):
     print("load env ..")
     env_name =("CartPole-v0")
     #env = gym.make("Car-v0")
-    max_steps = 200
     start = time.time()
     env = suite_gym.load(env_name, discount=arg.gamma, max_episode_steps=arg.max_t)
     print_parameter(arg, pars)
@@ -83,7 +82,7 @@ def main(arg, pars):
     tf_agent.collect_data_spec._fields
     collect_data(train_env, random_policy, replay_buffer, steps=arg.learn_start, max_t=arg.max_t)
     print("create dataset")
-    dataset = replay_buffer.as_dataset(num_parallel_calls=3,  sample_batch_size=batch_size, num_steps=2).prefetch(3)
+    dataset = replay_buffer.as_dataset(num_parallel_calls=3, sample_batch_size=arg.batch_size, num_steps=2).prefetch(3)
     iterator = iter(dataset)
     
     # (Optional) Optimize by wrapping some of the code in a graph using TF function.
@@ -94,8 +93,11 @@ def main(arg, pars):
     returns = [avg_return]
     returns_average = [avg_return]
     train_loss_average = [1]
-    train_dir = os.path.join(root_dir, 'network_weights')
-    eval_dir = os.path.join(root_dir, 'eval')
+    train_dir = os.path.join(arg.root_dir, 'network_weights')
+    eval_dir = os.path.join(arg.root_dir, 'eval')
+    score = 0
+    scores_window = deque(maxlen=100)       # last 100 scores
+    total_train_loss = deque(maxlen=1000)       # last 100 scores
 
 
 
@@ -139,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument('--discount', type=float, default=0.99, metavar='gamma', help='Discount factor')
     parser.add_argument('--target-update', type=int, default=int(4), metavar='tau', help='Number of steps after which to update target network')
     parser.add_argument('--device', default="cpu", type=str)
-    parser.add_argument('--rott', default="", type=str)
+    parser.add_argument('--root_dir', default="", type=str)
     parser.add_argument('--model_num', default=1)
     arg = parser.parse_args()
     main(arg, parser)
