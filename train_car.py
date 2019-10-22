@@ -31,7 +31,7 @@ from tf_agents.utils import common
 tf.compat.v1.enable_v2_behavior()
 import gym
 import time
-from helper import collect_data
+from helper import collect_datai, print_parameter
 
 def main(arg, pars):
     """
@@ -82,6 +82,23 @@ def main(arg, pars):
     tf_agent.collect_data_spec
     tf_agent.collect_data_spec._fields
     collect_data(train_env, random_policy, replay_buffer, steps=arg.learn_start, max_t=arg.max_t)
+    print("create dataset")
+    dataset = replay_buffer.as_dataset(num_parallel_calls=3,  sample_batch_size=batch_size, num_steps=2).prefetch(3)
+    iterator = iter(dataset)
+    
+    # (Optional) Optimize by wrapping some of the code in a graph using TF function.
+    tf_agent.train = common.function(tf_agent.train)
+    # Reset the train step
+    tf_agent.train_step_counter.assign(0)
+    avg_return = compute_avg_return(eval_env, tf_agent.policy, arg.num_eval_episodes)
+    returns = [avg_return]
+    returns_average = [avg_return]
+    train_loss_average = [1]
+    train_dir = os.path.join(root_dir, 'network_weights')
+    eval_dir = os.path.join(root_dir, 'eval')
+
+
+
 
 
 def print_parameter(args, parser):
@@ -100,6 +117,8 @@ def print_parameter(args, parser):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--n_episodes', default=500)
+    parser.add_argument('--num_eval_episodes', default=1)
+    parser.add_argument('--save_weights_every', default=100)
     parser.add_argument('--max_t', default=200)
     parser.add_argument('--eps_start', default=1.0)
     parser.add_argument('--eps_end', default=0.01)
@@ -107,30 +126,20 @@ if __name__ == "__main__":
     parser.add_argument('--buffer-size', default=500000, type=int)
     parser.add_argument('--batch-size', default=64, type=int)
     parser.add_argument('--gamma', default=0.99)
-    parser.add_argument('--noise', default=False)
     parser.add_argument('--tau', default=1e-3)
     parser.add_argument('--lr', default=0.00005)
     parser.add_argument('--update-every', default=4, type=int)
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--hidden_size_1', default=512)
-    parser.add_argument('--hidden_size_2', default=64, type=int)
-    parser.add_argument('--V-min', type=float, default=-10, metavar='V', help='Minimum of value distribution support')
-    parser.add_argument('--V-max', type=float, default=10, metavar='V', help='Maximum of value distribution support')
-    parser.add_argument('--atoms', type=int, default=51, metavar='C', help='Discretised size of value distribution')
     parser.add_argument('--replay-frequency', type=int, default=10, metavar='k', help='Frequency of sampling from memory')
-    parser.add_argument('--noisy-std', type=float, default=0.1, metavar='sigma', help='Initial standard deviation of noisy linear layers')
     parser.add_argument('--learn-start', type=int, default=int(800), metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--model', type=str, metavar='PARAMS', help='Pretrained model (state dict)')
-    parser.add_argument('--adam-eps', type=float, default=1e-8, metavar='eps', help='Adam epsilon')
-    parser.add_argument('--priority-exponent', type=float, default=0.0, metavar='omega', help='Prioritised experience replay exponent (originally denoted alpha)')
-    parser.add_argument('--priority-weight', type=float, default=0.8, metavar='beata', help='Initial prioritised experience replay importance sampling weight')
     parser.add_argument('--evaluation-size', type=int, default=50000, metavar='N', help='Number of transitions to use for validating Q')
     parser.add_argument('--history-length', type=int, default=1, metavar='T', help='Number of consecutive states processed')
     parser.add_argument('--discount', type=float, default=0.99, metavar='gamma', help='Discount factor')
-    parser.add_argument('--multi-step', type=int, default=1, metavar='n', help='Number of steps for multi-step return')
     parser.add_argument('--target-update', type=int, default=int(4), metavar='tau', help='Number of steps after which to update target network')
-    parser.add_argument('--reward-clip', type=int, default=0, metavar='VALUE', help='Reward clipping (0 to disable)')
     parser.add_argument('--device', default="cpu", type=str)
+    parser.add_argument('--rott', default="", type=str)
     parser.add_argument('--model_num', default=1)
     arg = parser.parse_args()
     main(arg, parser)
