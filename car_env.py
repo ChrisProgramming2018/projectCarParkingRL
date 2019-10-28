@@ -12,13 +12,14 @@ import os
 import setup_path
 import time
 import matplotlib.pyplot as plt
+from PIL import Image
 
 
 
 
 class CarEnv(gym.Env):
     def __init__(self):
-        self.client = airsim.CarClient()
+        self.client = airsim.CarClient("10.8.105.156")
         self.client.confirmConnection()
         self.client.enableApiControl(True)
         self.car_controls = airsim.CarControls()
@@ -35,34 +36,26 @@ class CarEnv(gym.Env):
         self.z_rot_goal = 0.02    # 0.019440
         self.max_step = 10  # steps to check if blocked 
         self.last_states = queue.deque(maxlen=self.max_step)        
-        self.height = 70
-        self.width = 320   # old 320 
+        self.height = 84
+        self.width = 84  # old 320 
         # self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
-        self.observation_space = spaces.Box(0, 255, [self.height, self.width])
+        self.observation_space = spaces.Box(low = 0, high = 255, shape=(self.height, self.width,2))
         self.debug_mode = False
         self.goal_counter = 0
+        self.count = 0
 
     def reset(self):
         """
         This function resets the environment and returns the game state.
         """
         self.client.reset()
-        self.last_states = queue.deque(maxlen=self.max_step)        
         
-        responses = self.client.simGetImages([airsim.ImageRequest("0", airsim.ImageType.DepthVis), #depth visualization image
-            airsim.ImageRequest("1", airsim.ImageType.DepthPerspective, True), #depth in perspective projection
-            airsim.ImageRequest("1", airsim.ImageType.Scene), #scene vision image in png format
-            airsim.ImageRequest("1", airsim.ImageType.Scene, False, False)])  #scene vision image in uncompressed RGB array
+        state1 = self._get_state("3")  # forward camera
+        state2 = self._get_state("4") # backward camera
+        state = np.stack((state1, state2), axis=2)
         pose = self.client.simGetVehiclePose()
         reward = self._get_reward(pose)
         self.time_step = 0 
-
-        done = False
-        for response in responses:
-            img1d = np.fromstring(response.image_data_uint8, dtype= np.uint8) # get numpy array
-            if img1d.shape[0] == 268800:
-                state= img1d.reshape(response.height, response.width, 3) # reshape array to 3 channel image array H X W>
-        state = self.process_image(state) 
         return np.array(state)
 
         
@@ -149,43 +142,20 @@ class CarEnv(gym.Env):
             self.car_controls.throttle = -0.5
             self.car_controls.steering = -1
             self.client.setCarControls(self.car_controls)
-        
-        #print("new command")
-        #print("Set control to :", self.car_controls.throttle)
-        # check if car is close to goal state
-        # check if car is close to goal state
-        # check if car is close to goal state
-        #print("Set steering to : ", self.car_controls.steering)
-        
-        responses = self.client.simGetImages([airsim.ImageRequest("0", airsim.ImageType.DepthVis), #depth visualization image
-            airsim.ImageRequest("1", airsim.ImageType.DepthPerspective, True), #depth in perspective projection
-            airsim.ImageRequest("1", airsim.ImageType.Scene), #scene vision image in png format
-            airsim.ImageRequest("1", airsim.ImageType.Scene, False, False)])  #scene vision image in uncompressed RGB array
+
         pose = self.client.simGetVehiclePose()
-        self.last_states.append(pose)
         reward = self._get_reward(pose)
+        done  = False
+        state1 = self._get_state("3")  # forward camera
+        state2 = self._get_state("4") # backward camera
+        state = np.stack((state1, state2), axis=2)
+        #if reward > -2:
+        #    reward = reward + 2 
         if self._is_goal(pose):
-            self.goal_counter += 1
-            reward = 50
-            print("reached goal state: ", self.goal_counter)
-        done = False
-        state_exists = False
-        for response in responses:
-            img1d = np.fromstring(response.image_data_uint8, dtype= np.uint8) # get numpy array
-            if img1d.shape[0] == 268800:
-                state_exists = True
-                state = img1d.reshape(response.height, response.width, 3) # reshape array to 3 channel image array H X W>
-                state = self.process_image(state)
-        # In case there is not state
-        if state_exists == False:
-            self.counter_no_state +=1
-            print("No state ", self.counter_no_state)
-            state = np.zeros((self.height, self.width))
-        if self.debug_mode:
-            debug_message = 'reward step:{:.2f}'.format(reward)
-            print(debug_message, end='\r', flush=True) 
-        reward /= 10
-        return state, reward, done, pose
+            reward = 1
+        else:
+            reward  = min(reward, -3) 
+        return state, reward, done, pose 
     
     def process_image(self, state):
         state =  cv2.cvtColor(state, cv2.COLOR_BGR2GRAY)
@@ -220,12 +190,6 @@ class CarEnv(gym.Env):
         return -dif
 
 
-    def _get_game_state(self):
-        """
-        This function returns the current game state.
-        len(self.colors) means None
-        """
-        pass
 
     def _is_goal(self, pose):
         x_pos = pose.position.x_val
@@ -253,18 +217,10 @@ class CarEnv(gym.Env):
             debug_message = debug_message.format(x_dif, y_dif, z_dif, x_r_dif, y_r_dif , z_r_dif)
             print(debug_message, end='\r', flush=True) 
         if x_dif < eps and y_dif < eps and z_dif < eps and x_r_dif < eps  and y_r_dif < eps  and z_r_dif < eps:
-            print("reached goal state")
+            self.goal_counter +=1
             return True
         return False 
 
-
-    def _get_game_state(self):
-        """
-        This function returns the current game state.
-        len(self.colors) means None
-        """
-        pass
-
         
 
     def _is_over(self):
@@ -288,10 +244,29 @@ class CarEnv(gym.Env):
             return True
         return False
 
-
-
-
-
+    def _get_state(self, camera):
+        """ if camera is 3 forward and 4 backward
+        """
+        # get back camera 
+        responses = self.client.simGetImages([airsim.ImageRequest(camera,
+            airsim.ImageType.DepthVis),
+            airsim.ImageRequest("3", airsim.ImageType.DepthPerspective, True), #depth in pe>
+            airsim.ImageRequest(camera, airsim.ImageType.Scene), #scene
+            airsim.ImageRequest(camera, airsim.ImageType.Scene, False, False)])
+        state_exists = False
+        for response in responses:
+            img1d = np.fromstring(response.image_data_uint8, dtype= np.uint8) # get numpy array
+            if img1d.shape[0] == 268800:
+                state_exists = True
+                state= img1d.reshape(response.height, response.width, 3) # reshape array to 3 channel image
+                #img = Image.fromarray(state, 'RGB')
+                #text = 'my-{}.png'.format(self.count)
+                #self.count +=1
+                #img.save(text)
+                state = self.process_image(state) 
+        if state_exists == False:
+            state = np.zeros((self.height, self.width))
+        return state
         
 
     def _is_over(self):
@@ -314,8 +289,3 @@ class CarEnv(gym.Env):
         if the_same >=25:
             return True
         return False
-
-
-
-
-
