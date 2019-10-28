@@ -30,6 +30,7 @@ from tf_agents.utils import common
 
 tf.compat.v1.enable_v2_behavior()
 import gym
+import gym_car
 import time
 from helper import collect_data, print_parameter, compute_avg_return, train
 
@@ -39,7 +40,7 @@ def main(arg, pars):
     
     """
     print("load env ..")
-    env_name =("CartPole-v0")
+    env_name =("Car-v0")
     #env = gym.make("Car-v0")
     env = suite_gym.load(env_name, discount=arg.gamma, max_episode_steps=arg.max_t)
     print_parameter(arg, pars)
@@ -135,16 +136,16 @@ def print_parameter(args, parser):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_episodes', default=500)
+    parser.add_argument('--n_episodes', default=20000)
     parser.add_argument('--num_eval_episodes', default=1)
     parser.add_argument('--save_weights_every', default=100)
     parser.add_argument('--eval_interval', default=100)
-    parser.add_argument('--max_t', default=200)
+    parser.add_argument('--max_t', default=50)
     parser.add_argument('--eps_start', default=1.0)
     parser.add_argument('--eps_end', default=0.01)
-    parser.add_argument('--eps_decay', default=0.990)
-    parser.add_argument('--buffer-size', default=500000, type=int)
-    parser.add_argument('--batch-size', default=64, type=int)
+    parser.add_argument('--eps_decay', default=0.99986)
+    parser.add_argument('--buffer-size', default=200000, type=int)
+    parser.add_argument('--batch-size', default=32, type=int)
     parser.add_argument('--continue_training', default=False, type=bool)
     parser.add_argument('--gamma', default=0.99)
     parser.add_argument('--tau', default=1e-3)
@@ -153,7 +154,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', default=42, type=int)
     parser.add_argument('--hidden_size_1', default=512)
     parser.add_argument('--replay-frequency', type=int, default=10, metavar='k', help='Frequency of sampling from memory')
-    parser.add_argument('--learn-start', type=int, default=int(800), metavar='STEPS', help='Number of steps before starting training')
+    parser.add_argument('--learn-start', type=int, default=int(500), metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--model', type=str, metavar='PARAMS', help='Pretrained model (state dict)')
     parser.add_argument('--evaluation-size', type=int, default=50000, metavar='N', help='Number of transitions to use for validating Q')
     parser.add_argument('--history-length', type=int, default=1, metavar='T', help='Number of consecutive states processed')

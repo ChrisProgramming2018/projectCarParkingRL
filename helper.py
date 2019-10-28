@@ -9,7 +9,7 @@ from tf_agents.trajectories import trajectory
 
 def collect_step(environment, policy, buffer, max_t):
     """ """
-    
+    goal = 0
     time_step = environment.reset()
     # seed = np.random.randint(0,7)
     seed = np.random.uniform()
@@ -19,12 +19,14 @@ def collect_step(environment, policy, buffer, max_t):
         next_time_step = environment.step(action_step.action)
         traj = trajectory.from_transition(time_step, action_step, next_time_step)
         episode_reward += time_step.reward.numpy()[0]
+        if time_step.reward.numpy()[0] == 10:
+            goal += 1
         # Add trajectory to the replay buffer
         buffer.add_batch(traj)
         time_step = next_time_step
         if time_step.is_last().numpy()[0]:
             break
-    return episode_reward
+    return episode_reward, goal
 
 def collect_data(env, policy, buffer, steps, max_t):
     for _ in range(steps):
@@ -49,7 +51,7 @@ def print_parameter(args, parser):
 
 
 
-def data_loger(episode, start, episode_reward, scores_window, eps, td_loss):
+def data_loger(episode, start, episode_reward, scores_window, eps, td_loss, goal):
     """
 
     """
@@ -58,8 +60,9 @@ def data_loger(episode, start, episode_reward, scores_window, eps, td_loss):
     minutes = time_passed / 60
     hours = time_passed / 3600
     text = 'Episode: {}: reward: {:.0f} average reward: {:.0f}  eps: {:.3f} '
-    text += 'td_loss: {:.4f} time: {:.0f} h {:.0f} min {:.0f} sec '
-    text= text.format(episode, episode_reward, np.mean(scores_window), eps, td_loss, hours, minutes % 60, time_passed % 60 )
+    text += 'td_loss: {:.4f} goal: {} time: {:.0f} h {:.0f} min {:.0f} sec '
+    text= text.format(episode, episode_reward, np.mean(scores_window), eps,
+            td_loss, goal, hours, minutes % 60, time_passed % 60 )
     return text
 
 
@@ -135,6 +138,7 @@ def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_che
     scores_window = deque(maxlen=100)       # last 100 scores
     total_train_loss = deque(maxlen=1000)       # last 100 scores
     start = time.time()
+    sum_goals = 0
     for episode in range(arg.n_episodes):
         step = tf_agent.train_step_counter.numpy()
         
@@ -144,8 +148,8 @@ def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_che
             
         # Collect a few steps using collect_policy and save to the replay buffer.
     
-        episode_reward = collect_step(train_env, tf_agent.collect_policy, replay_buffer, arg.max_t)
-        
+        episode_reward, goal = collect_step(train_env, tf_agent.collect_policy, replay_buffer, arg.max_t)
+        sum_goals += goal
         # Sample a batch of data from the buffer and update the
         # agent's network.
         
@@ -165,8 +169,8 @@ def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_che
             returns_average.append(np.mean(scores_window))
             train_loss_average.append(np.mean(total_train_loss))
             save_and_plot(episode, returns_average, returns, train_loss_average)
-        text = data_loger(episode, start, train_loss, episode_reward, np.mean(scores_window),
-                tf_agent.collect_policy._get_epsilon())
+        text = data_loger(episode, start, episode_reward, np.mean(scores_window),
+                tf_agent.collect_policy._get_epsilon(), train_loss, sum_goals)
         write_into_file(text)
         print(text, end="\r", flush=True)
         eps = max(arg.eps_end, arg.eps_decay*eps)
