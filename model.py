@@ -34,6 +34,7 @@ class NoisyLinear(nn.Module):
     return x.sign().mul_(x.abs().sqrt_())
 
   def reset_noise(self):
+    print("reset_noise")
     epsilon_in = self._scale_noise(self.in_features)
     epsilon_out = self._scale_noise(self.out_features)
     self.weight_epsilon.copy_(epsilon_out.ger(epsilon_in))
@@ -41,6 +42,9 @@ class NoisyLinear(nn.Module):
 
   def forward(self, input):
     if self.training:
+      #print("training")
+      #print("weight sigma ", self.weight_sigma)
+      #print("weight epsilon ", self.weight_epsilon)
       return F.linear(input, self.weight_mu + self.weight_sigma * self.weight_epsilon, self.bias_mu + self.bias_sigma * self.bias_epsilon)
     else:
       return F.linear(input, self.weight_mu, self.bias_mu)
@@ -61,10 +65,15 @@ class DQN(nn.Module):
       self.convs = nn.Sequential(nn.Conv2d(args.history_length, 32, 5, stride=5, padding=0), nn.ReLU(),
                                  nn.Conv2d(32, 64, 5, stride=5, padding=0), nn.ReLU())
       self.conv_output_size = 576
-    self.fc_h_v = NoisyLinear(self.conv_output_size, args.hidden_size, std_init=args.noisy_std)
-    self.fc_h_a = NoisyLinear(self.conv_output_size, args.hidden_size, std_init=args.noisy_std)
-    self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std)
-    self.fc_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.noisy_std)
+    #self.fc_h_v = NoisyLinear(self.conv_output_size, args.hidden_size, std_init=args.noisy_std)
+    #self.fc_h_a = NoisyLinear(self.conv_output_size, args.hidden_size, std_init=args.noisy_std)
+    #self.fc_z_v = NoisyLinear(args.hidden_size, self.atoms, std_init=args.noisy_std)
+    #self.fc_z_a = NoisyLinear(args.hidden_size, action_space * self.atoms, std_init=args.noisy_std)
+    
+    self.fc_h_v = nn.Linear(self.conv_output_size, args.hidden_size)
+    self.fc_h_a = nn.Linear(self.conv_output_size, args.hidden_size)
+    self.fc_z_v = nn.Linear(args.hidden_size, self.atoms)
+    self.fc_z_a = nn.Linear(args.hidden_size, action_space * self.atoms)
 
   def forward(self, x, log=False):
     x = self.convs(x)
@@ -77,6 +86,7 @@ class DQN(nn.Module):
       q = F.log_softmax(q, dim=2)  # Log probabilities with action over second dimension
     else:
       q = F.softmax(q, dim=2)  # Probabilities with action over second dimension
+      #print("q", q)
     return q
 
   def reset_noise(self):

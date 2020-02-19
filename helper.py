@@ -1,5 +1,6 @@
 """   """
 import os
+import cv2
 import time
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,19 +8,41 @@ from collections import deque
 from tf_agents.trajectories import trajectory
 
 
-def collect_step(environment, policy, buffer, max_t):
+def collect_step(environment, policy, agent, buffer, max_t):
     """ """
+    debug_mode = False
+    environment.set_debug(False)
     goal = 0
     time_step = environment.reset()
     # seed = np.random.randint(0,7)
     seed = np.random.uniform()
     episode_reward = 0
     for step in range(max_t):
+        
         action_step = policy.action(time_step, seed=seed)
         next_time_step = environment.step(action_step.action)
         traj = trajectory.from_transition(time_step, action_step, next_time_step)
         episode_reward += time_step.reward.numpy()[0]
-        if time_step.reward.numpy()[0] == 10:
+        # for debuging test if key d was presed
+        if cv2.waitKey(100) == ord('d'):
+            debug_mode = True
+        if cv2.waitKey(101) == ord('e'):
+            print("e pressed")
+            environment.set_debug(True)
+        if debug_mode:
+            network_observation = time_step.observation
+            q_values, _ = agent._q_network(network_observation, time_step.step_type)
+            q_list = [x for x in q_values.numpy()[0]]
+            x = q_list
+            y = [i for i in range(len(q_list))]
+            plt.bar(y,x, width=0.1)
+            plt.draw()
+            plt.pause(0.0001)
+            plt.clf()
+        else:
+            plt.close()
+
+        if time_step.reward.numpy()[0] > -0.01:
             goal += 1
         # Add trajectory to the replay buffer
         buffer.add_batch(traj)
@@ -28,9 +51,9 @@ def collect_step(environment, policy, buffer, max_t):
             break
     return episode_reward, goal
 
-def collect_data(env, policy, buffer, steps, max_t):
+def collect_data(env, policy, buffer, agent, steps, max_t):
     for _ in range(steps):
-        collect_step(env, policy, buffer, max_t)
+        collect_step(env, policy, agent, buffer, max_t)
         text = "collect Episode {} of {} "
         print(text.format(_, steps), end="\r", flush=True)
 
@@ -86,13 +109,13 @@ def save_and_plot(num_iterations, returns_average, returns, td_loss, model=1):
     legend.get_frame().set_facecolor('C0')
     plt.ylabel('Average Return')
     plt.xlabel('Iterations')
-    plt.ylim(top=25)
+    #plt.ylim(top=25)
     plt.savefig('results/model-1/scores-{}.png'.format(num_iterations))
     fig, ax = plt.subplots()
     ax.plot(iterations, td_loss, label='loss')
     plt.ylabel('td_loss')
     plt.xlabel('Iterations')
-    plt.ylim(top=1)
+    #plt.ylim(top=30)
     plt.savefig('results/model-1/loss-{}.png'.format(num_iterations))
     print("plot saved")
 
@@ -105,7 +128,6 @@ def compute_avg_return(environment, policy, num_episodes=2):
     total_return = 0.0
     test = 0
     for _ in range(num_episodes):
-        print("Episode", _)
         test += 1
         time_step = environment.reset()
         episode_return = 0.0
@@ -136,19 +158,19 @@ def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_che
     train_loss_average = []
     score = 0
     scores_window = deque(maxlen=100)       # last 100 scores
-    total_train_loss = deque(maxlen=1000)       # last 100 scores
+    total_train_loss = deque(maxlen=100)       # last 100 scores
     start = time.time()
     sum_goals = 0
     for episode in range(arg.n_episodes):
         step = tf_agent.train_step_counter.numpy()
         
         if episode % arg.save_weights_every  == 0:
-            print("Save Networkweights", end='\n')
+            print("\n Save Networkweights", end='\n')
             train_checkpointer.save(global_step=step)
             
         # Collect a few steps using collect_policy and save to the replay buffer.
     
-        episode_reward, goal = collect_step(train_env, tf_agent.collect_policy, replay_buffer, arg.max_t)
+        episode_reward, goal = collect_step(train_env, tf_agent.collect_policy, tf_agent, replay_buffer, arg.max_t)
         sum_goals += goal
         # Sample a batch of data from the buffer and update the
         # agent's network.
@@ -162,7 +184,7 @@ def train(arg, tf_agent, train_env, eval_env, replay_buffer, iterator, train_che
         
         if episode % arg.eval_interval == 0:
             avg_return = compute_avg_return(eval_env, tf_agent.policy, arg.num_eval_episodes)
-            text = 'Episode = {}: Average Return = {:.0f}'
+            text = '\nEpisode = {}: Average Return = {:.0f}'
             text = text.format(episode, avg_return)
             print(text, end="\n")
             returns.append(avg_return)

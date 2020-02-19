@@ -24,7 +24,7 @@ import tqdm
 
 
 
-def  test(args, env):
+def eval_policy(args, env):
     action_space = env.action_space.n
     print("show action space", action_space)
     # Agent
@@ -45,7 +45,7 @@ def  test(args, env):
         state_buffer.append(zeros)
         state_buffer.append(state)                        
         state = torch.stack(list(state_buffer),0)
-        for step in range(50):
+        for step in range(100):
             action = dqn.act_e_greedy(state, eps)  # Choose an action greedily (with noisy weights)
             next_state, reward, done, _ = env.step(action)
             print(reward)
@@ -60,6 +60,10 @@ def  test(args, env):
 
 
 def train(args, env):
+    action_space = env.action_space.n
+    print("show action space", action_space)
+    # Agent
+    dqn = Agent(args, env)
     # If a model is provided, and evaluate is fale, presumably we want to resume, so try to load memory
     if args.model is not None and not args.evaluate:
         if not args.memory:
@@ -105,20 +109,45 @@ def train(args, env):
     val_mem = ReplayMemory(args, args.evaluation_size)
     T, done = 0, True
     size = 84
-    
+    eps = 1 
+    print("Fill eval memory")
     while T < args.evaluation_size:
-        T += 50
+        T += 1
         print("steps ", T)
-    
-    
+        if done:
+            print("reset")
+            t = 0
+            done = False
+            state = env.reset()
+            state = cv2.resize(state, (size, size), interpolation=cv2.INTER_LINEAR)
+            state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
+            zeros = torch.zeros_like(state)
+            state_buffer = deque([], maxlen=args.history_length)
+            state_buffer.append(zeros)
+            state_buffer.append(zeros)
+            state_buffer.append(zeros)
+            state_buffer.append(state)                        
+            state = torch.stack(list(state_buffer),0)
+        t += 1
+        if t == 50:
+            t = 0
+            done = True
+        next_state, _, _ ,_= env.step(np.random.randint(0, action_space))
+        
+        val_mem.append(state, None, None, done)
+        next_state = cv2.resize(next_state, (size, size), interpolation=cv2.INTER_LINEAR)
+        next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
+        state_buffer.append(next_state)
+        state = torch.stack(list(state_buffer), 0)
     eps = 1.0
     eps_end = 0.05
     eps_decay = 0.999996
-    # args.evaluate = True
+    #args.evaluate = True
     if args.evaluate:
         print("Test")
         dqn.eval()  # Set DQN (online network) to evaluation mode
-        avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, env, evaluate=True)  # Test
+        #avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, env, evaluate=True)  # Test
+        avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir, env)  # Test
         print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
     else:
         # Training loop
@@ -128,7 +157,7 @@ def train(args, env):
         episode_reward = 0
         for T in tqdm.trange(0, args.T_max + 1):
             if T % args.max_episode_length == 0:
-                print("Epiosde: {}  Reward: {} ".format(episode, episode_reward))
+                #print("Epiosde: {}  Reward: {} ".format(episode, episode_reward))
                 episode_reward = 0
                 episode += 1
                 state, done = env.reset(), False
@@ -186,8 +215,8 @@ def train(args, env):
     
                 # checkpoint the network
                 if (args.checkpoint_interval != 0) and (T % args.checkpoint_interval == 0):
-                    print("save memory", args.memory)
-                    save_memory(mem, args.memory, args.disable_bzip_memory)
+                    #print("save memory", args.memory)
+                    #save_memory(mem, args.memory, args.disable_bzip_memory)
                     print("epsilon", eps)
                     print("Save model at ", results_dir)
                     dqn.save(results_dir, '{}-checkpoint.pth'.format(T))
@@ -241,7 +270,7 @@ if __name__ == "__main__":
             help='Number of transitions to use for validating Q')
     parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
     parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
-    parser.add_argument('--checkpoint-interval', default=7500, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
+    parser.add_argument('--checkpoint-interval', default=100000, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
     parser.add_argument('--memory', help='Path to save/load the memory from')
     parser.add_argument('--disable-bzip-memory', action='store_true', help='Don\'t zip the memory file. Not recommended (zipping is a bit slower and much, much smaller)')
     parser.add_argument('--device', type=str, default='cpu')
@@ -249,5 +278,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     env = gym.make('Car-v0')
 
-    test(args, env)
-    
+    eval_policy(args, env)
+    #train(args, env)

@@ -14,6 +14,7 @@ import PIL.Image
 import tensorflow as tf
 import queue
 import csv
+import cv2
 import argparse
 from collections import  deque
 from tf_agents.agents.dqn import dqn_agent
@@ -27,7 +28,6 @@ from tf_agents.policies import random_tf_policy
 from tf_agents.replay_buffers import tf_uniform_replay_buffer
 from tf_agents.trajectories import trajectory
 from tf_agents.utils import common
-print(dqn_agent.__file__)
 tf.compat.v1.enable_v2_behavior()
 import gym
 import gym_car
@@ -106,7 +106,8 @@ def main(arg, pars):
             max_length=arg.buffer_size)
     tf_agent.collect_data_spec
     tf_agent.collect_data_spec._fields
-    collect_data(train_env, random_policy, replay_buffer, steps=arg.learn_start, max_t=40)
+    cv2.namedWindow("display", cv2.WINDOW_NORMAL)
+    collect_data(train_env, random_policy, replay_buffer, tf_agent, steps=arg.learn_start, max_t=40)
     print("create dataset")
     dataset = replay_buffer.as_dataset(num_parallel_calls=3, sample_batch_size=arg.batch_size, num_steps=2).prefetch(3)
     iterator = iter(dataset)
@@ -144,24 +145,24 @@ def print_parameter(args, parser):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--n_episodes', default=25000,type=int)
+    parser.add_argument('--n_episodes', default=4000,type=int)
     parser.add_argument('--num_eval_episodes', default=3)
-    parser.add_argument('--save_weights_every', default=100, type=int)
-    parser.add_argument('--eval_interval', default=100, type=int)
-    parser.add_argument('--max_t', default=30, type=int)
+    parser.add_argument('--save_weights_every', default=300, type=int)
+    parser.add_argument('--eval_interval', default=300, type=int)
+    parser.add_argument('--max_t', default=20, type=int)
     parser.add_argument('--eps_start', default=1.0, type=float)
     parser.add_argument('--eps_end', default=0.1, type=float)
-    parser.add_argument('--eps_decay', default= 0.99993, type=float)
-    parser.add_argument('--buffer-size', default=450000, type=int)
+    parser.add_argument('--eps_decay', default=  0.999, type=float, help=' is 50 per at 12000')
+    parser.add_argument('--buffer-size', default=200000, type=int)
     parser.add_argument('--batch-size', default=32, type=int)
     parser.add_argument('--continue_training', default=False, type=bool)
     parser.add_argument('--gamma', default=0.99, type=float)
     parser.add_argument('--tau', default=1e-3, type=float)
     parser.add_argument('--lr', default=0.00025,type=float)
     parser.add_argument('--repeat_training', default=1, type=int)
-    parser.add_argument('--seed', default=2, type=int)
+    parser.add_argument('--seed', default=4, type=int)
     parser.add_argument('--hidden_size_1', default=512)
-    parser.add_argument('--learn-start', type=int, default=int(300), metavar='STEPS', help='Number of Episodes before start learning')
+    parser.add_argument('--learn-start', type=int, default=int(50), metavar='STEPS', help='Number of Episodes before start learning')
     parser.add_argument('--model', type=str, metavar='PARAMS', help='Pretrained model (state dict)')
     parser.add_argument('--evaluation-size', type=int, default=50000, metavar='N', help='Number of transitions to use for validating Q')
     parser.add_argument('--history-length', type=int, default=1, metavar='T', help='Number of consecutive states processed')
