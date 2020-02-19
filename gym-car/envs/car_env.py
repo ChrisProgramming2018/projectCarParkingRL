@@ -23,7 +23,7 @@ class CarEnv(gym.Env):
         self.client.confirmConnection()
         self.client.enableApiControl(True)
         self.car_controls = airsim.CarControls()
-        self.action_space = spaces.Discrete(4)
+        self.action_space = spaces.Discrete(6)
         self.time_step = 0 
         self.x_pos_goal = 0.6   #0.545647 0.6
         self.y_pos_goal = -2.5  #-2.5
@@ -140,27 +140,33 @@ class CarEnv(gym.Env):
             # Go backward
             self.car_controls.throttle = -0.5
             self.car_controls.steering = 0
+            self.car_controls.is_manual_gear = True;
+            self.car_controls.manual_gear = -1
             self.client.setCarControls(self.car_controls)
         
         if action == 5:
             # Go backward + steer right
             self.car_controls.throttle = -0.5
             self.car_controls.steering = 1
+            self.car_controls.is_manual_gear = True;
+            self.car_controls.manual_gear = -1
             self.client.setCarControls(self.car_controls)
         
         if action == 6:
             # Go backward + steer left
             self.car_controls.throttle = -0.5
             self.car_controls.steering = -1
+            self.car_controls.is_manual_gear = True;
+            self.car_controls.manual_gear = -1
             self.client.setCarControls(self.car_controls)
         # act  for certain time and stop
         time.sleep(0.2)
 
-        #print("throttle", self.car_controls.throttle)
-        #print("steering", self.car_controls.steering)
         self.car_controls.throttle = 0
         self.car_controls.steering = 0
         self.car_controls.brake = 1
+        self.car_controls.is_manual_gear = False; # change back gear to auto
+        self.car_controls.manual_gear = 0
         self.client.setCarControls(self.car_controls)
         
         pose = self.client.simGetVehiclePose()
@@ -225,12 +231,12 @@ class CarEnv(gym.Env):
         z_r_dif = math.sqrt((z_rot - self.z_rot_goal)**2)
         dif = x_dif + y_dif + z_dif + x_r_dif + y_r_dif + z_r_dif
         if y_dif >= 3:
-            reward = -1
+            reward = 0
         else:
-            reward  = max(-dif, -3)
+            reward  = max(-dif, 0)
         
-        if dif < 2:
-            reward = 0.5**abs(dif)
+        if dif < 3:
+            reward = 0.7**abs(dif)
         if dif < 0.3:
             reward = 1
 
