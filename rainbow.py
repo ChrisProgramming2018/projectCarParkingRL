@@ -10,7 +10,7 @@ from torch import optim
 from memory import ReplayMemory
 from model import DQN
 from agent import Agent
-from test import test
+from test import test, _plot_line
 import gym
 
 import argparse
@@ -36,7 +36,6 @@ def eval_policy(args, env):
     for episode in range(2):
         print("Episode ", episode)
         state = env.reset()
-        state = cv2.resize(state, (size, size), interpolation=cv2.INTER_LINEAR)
         state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
         zeros = torch.zeros_like(state)
         state_buffer = deque([], maxlen=args.history_length)
@@ -62,6 +61,7 @@ def eval_policy(args, env):
 def train(args, env):
     action_space = env.action_space.n
     print("show action space", action_space)
+    print("state space", env.observation_space)
     # Agent
     dqn = Agent(args, env)
     # If a model is provided, and evaluate is fale, presumably we want to resume, so try to load memory
@@ -75,7 +75,7 @@ def train(args, env):
         mem = ReplayMemory(args, args.memory_capacity)
     
     priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn_start)
-    metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
+    metrics = {'steps': [], 'rewards': [], 'Qs': [], 'step_rewards': [], 'train_rewards': [] , 'best_avg_reward': -float('inf')}
     results_dir = os.path.join('results', args.id)
     print("result dir", results_dir)
     args.memory = results_dir + "/memory.pkl"
@@ -109,17 +109,14 @@ def train(args, env):
     val_mem = ReplayMemory(args, args.evaluation_size)
     T, done = 0, True
     size = 84
-    eps = 1 
     print("Fill eval memory")
     while T < args.evaluation_size:
         T += 1
         print("steps ", T)
         if done:
-            print("reset")
             t = 0
             done = False
             state = env.reset()
-            state = cv2.resize(state, (size, size), interpolation=cv2.INTER_LINEAR)
             state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
             zeros = torch.zeros_like(state)
             state_buffer = deque([], maxlen=args.history_length)
@@ -135,11 +132,10 @@ def train(args, env):
         next_state, _, _ ,_= env.step(np.random.randint(0, action_space))
         
         val_mem.append(state, None, None, done)
-        next_state = cv2.resize(next_state, (size, size), interpolation=cv2.INTER_LINEAR)
         next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
         state_buffer.append(next_state)
         state = torch.stack(list(state_buffer), 0)
-    eps = 1.0
+    eps = 1
     eps_end = 0.05
     eps_decay = 0.999996
     #args.evaluate = True
@@ -155,15 +151,20 @@ def train(args, env):
         T, done = 0, True
         episode = 0
         episode_reward = 0
+        mean_reward = deque(maxlen=100)
         for T in tqdm.trange(0, args.T_max + 1):
             if T % args.max_episode_length == 0:
-                #print("Epiosde: {}  Reward: {} ".format(episode, episode_reward))
+                print("Epiosde: {}  Reward: {} ".format(episode, episode_reward))
+                mean_reward.append(episode_reward)
+                print("Episode {}  reward mean {}  ".format(episode,
+                    np.mean(mean_reward)))
+                #_plot_line(metrics['step_rewards'], metrics['train_rewards'], 'Reward', path=results_dir)
+
                 episode_reward = 0
                 episode += 1
                 state, done = env.reset(), False
                 
                 
-                state = cv2.resize(state, (84, 84), interpolation=cv2.INTER_LINEAR)
                 state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
                 zeros = torch.zeros_like(state)
                 state_buffer = deque([], maxlen=args.history_length)
@@ -172,7 +173,6 @@ def train(args, env):
                 state_buffer.append(zeros)
                 state_buffer.append(state)                        
                 state = torch.stack(list(state_buffer), 0)
-            
             if T % args.replay_frequency == 0:
                 pass
                 #dqn.reset_noise()  # Draw a new set of noisy weights
@@ -191,11 +191,16 @@ def train(args, env):
             
             mem.append(state, action, reward, done)  # Append transition to memory
             # Train and test
-            next_state = cv2.resize(next_state, (84, 84), interpolation=cv2.INTER_LINEAR)
+            
             next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
+            #print("Main shape of  next_state", next_state.shape) 
             state_buffer.append(next_state)
             state = torch.stack(list(state_buffer), 0)
+            #print("Main shape of  state", state.shape) 
             eps = max(eps_end, eps_decay*eps)
+            
+            
+            
             # Train and test
             if T >= args.learn_start:
                 mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
@@ -221,9 +226,6 @@ def train(args, env):
                     print("Save model at ", results_dir)
                     dqn.save(results_dir, '{}-checkpoint.pth'.format(T))
     
-
-
-
 
 if __name__ == "__main__":
     print("Main")
@@ -270,7 +272,7 @@ if __name__ == "__main__":
             help='Number of transitions to use for validating Q')
     parser.add_argument('--render', action='store_true', help='Display screen (testing only)')
     parser.add_argument('--enable-cudnn', action='store_true', help='Enable cuDNN (faster but nondeterministic)')
-    parser.add_argument('--checkpoint-interval', default=100000, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
+    parser.add_argument('--checkpoint-interval', default=20000, help='How often to checkpoint the model, defaults to 0 (never checkpoint)')
     parser.add_argument('--memory', help='Path to save/load the memory from')
     parser.add_argument('--disable-bzip-memory', action='store_true', help='Don\'t zip the memory file. Not recommended (zipping is a bit slower and much, much smaller)')
     parser.add_argument('--device', type=str, default='cpu')
@@ -278,5 +280,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
     env = gym.make('Car-v0')
 
-    eval_policy(args, env)
-    #train(args, env)
+    #eval_policy(args, env)
+    train(args, env)
