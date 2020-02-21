@@ -1,0 +1,305 @@
+import gym
+import numpy as np
+import copy
+import random
+import math
+import queue
+import time
+from gym import spaces, error
+import airsim
+import cv2
+import os
+import setup_path
+import time
+import matplotlib.pyplot as plt
+from PIL import Image
+
+
+
+
+class CarEnv(gym.Env):
+    def __init__(self):
+        self.client = airsim.CarClient("10.8.105.156")
+        self.client.confirmConnection()
+        self.client.enableApiControl(True)
+        self.car_controls = airsim.CarControls()
+        self.action_space = spaces.Discrete(6)
+        self.time_step = 0 
+        self.x_pos_goal_2 = 0.6   #0.545647 0.6
+        self.y_pos_goal_2 = -2.5  #-2.5
+        self.z_pos_goal_2 = 0.2   #0.2
+        self.w_rot_goal_2 = 1.0    # 0.999967
+        self.x_rot_goal_2 = 0.0    # 
+        self.y_rot_goal_2 = 0.0    # -0.000095
+        self.z_rot_goal_2 = 0.02    # 0.019440
+        # 0.048309,-3.925571,0.184810,0.727446,-0.686165,-0.000000,-0.686165 
+        self.x_pos_goal_1 = 0.048   
+        self.y_pos_goal_1 = -3.925 
+        self.z_pos_goal_1 = 0.184   
+        self.w_rot_goal_1  = 0.727 
+        self.x_rot_goal_1 = -0.686    
+        self.y_rot_goal_1 = 0.0    
+        self.z_rot_goal_1 = -0.686    
+     
+        self.task_one_complete = False
+        
+        
+        self.height = 84
+        self.width = 84  # old 320 
+        # self.observation_space = spaces.Box(low=-high, high=high, dtype=np.float32)
+        self.observation_space = spaces.Box(low = 0, high = 255, shape=(2, self.height, self.width))
+        self.debug_mode = False
+        self.goal_counter = 0
+        self.count = 0
+        self.state = None
+    
+    def reset(self):
+        """
+        This function resets the environment and returns the game state.
+        """
+        self.client.reset()
+        self.task_one_complete = False
+        state = self._get_state("3")  # forward camera
+        self.state = self.image_processing(state) 
+        #print("rest state shape", self.state.shape)
+        return self.state
+
+        
+
+    def render(self, responses, mode='human', close=False):
+        """
+        This function renders the current game state in the given mode.
+        """
+        wait = 0.2
+        for response in responses:
+            img1d = np.fromstring(response.image_data_uint8, dtype= np.uint8) # get numpy array
+            if img1d.shape[0] == 268800:
+                img_rgb = img1d.reshape(response.height, response.width, 3) # reshape array to 3 channel image array H X W>
+                #cv2.imshow("video", img_rgb)
+                im = plt.imshow(img_rgb)
+                im.set_data(img_rgb)
+                plt.pause(wait)
+
+
+
+    def step(self, action):
+        """
+
+        Parameters
+        ----------
+        action : int
+            The action is an angle between 0 and 180 degrees, that
+            decides the direction of the bubble.
+
+        Returns
+        -------
+        ob, reward, episode_over, info : tuple
+            ob (object) :
+                an environment-specific object representing the
+                state of the environment.
+            reward (float) :
+                amount of reward achieved by the previous action.
+            episode_over (bool) :
+                whether it's time to reset the environment again.
+            info (dict) :
+                diagnostic information useful for debugging.
+        """
+        self.time_step += 1 
+        self.car_controls.brake = 0
+        #print("action", action)
+        if action == 0:
+            # go forward
+            self.car_controls.throttle = 0.5
+            self.car_controls.steering = 0
+            self.client.setCarControls(self.car_controls)
+        
+        if action == 1:
+            # Go forward + steer right
+            self.car_controls.throttle = 0.5
+            self.car_controls.steering = 1
+            self.client.setCarControls(self.car_controls)
+    
+        if action == 2:
+            # Go forward + steer left
+            self.car_controls.throttle = 0.5
+            self.car_controls.steering = -1
+            self.client.setCarControls(self.car_controls)
+    
+        if action == 3:
+            #  stop
+            self.car_controls.throttle = 0
+            self.car_controls.steering = 0
+            self.car_controls.brake = 1
+            self.client.setCarControls(self.car_controls)
+    
+        if action == 4:
+
+            # Go backward
+            self.car_controls.throttle = -0.5
+            self.car_controls.steering = 0
+            self.car_controls.is_manual_gear = True;
+            self.car_controls.manual_gear = -1
+            self.client.setCarControls(self.car_controls)
+        
+        if action == 5:
+            # Go backward + steer right
+            self.car_controls.throttle = -0.5
+            self.car_controls.steering = 1
+            self.car_controls.is_manual_gear = True;
+            self.car_controls.manual_gear = -1
+            self.client.setCarControls(self.car_controls)
+        
+        if action == 6:
+            # Go backward + steer left
+            self.car_controls.throttle = -0.5
+            self.car_controls.steering = -1
+            self.car_controls.is_manual_gear = True;
+            self.car_controls.manual_gear = -1
+            self.client.setCarControls(self.car_controls)
+        # act  for certain time and stop
+        time.sleep(0.2)
+
+        self.car_controls.throttle = 0
+        self.car_controls.steering = 0
+        self.car_controls.brake = 1
+        self.car_controls.is_manual_gear = False; # change back gear to auto
+        self.car_controls.manual_gear = 0
+        self.client.setCarControls(self.car_controls)
+        
+        pose = self.client.simGetVehiclePose()
+        
+        if self.task_one_complete:
+            reward = self._get_reward_task_2(pose)
+        else:
+            reward = self._get_reward_task_1(pose)
+        done  = False
+        state = self._get_state("3")  # forward camera
+        self.state = self.image_processing(state)
+        return self.state, reward, done, pose 
+    
+    def set_debug(self, debug=False):
+        """
+        """
+        print("my env")
+        self.debug_mode = debug
+
+    
+    def image_processing(self, state):
+        """ 
+        """
+        if self.debug_mode:
+            img = Image.fromarray(state, 'RGB')
+            img.show()
+            img.close()
+
+        state = cv2.resize(state, (84, 84), interpolation=cv2.INTER_LINEAR)
+        state = state[:, :, 0]
+        # add zeros to indicate to be in the first part
+        if self.task_one_complete:
+            zeros = np.zeros((84, 84))
+            zeros.fill(255)
+        else:
+            zeros = np.zeros((84, 84))
+        state = np.stack((state, zeros), axis=0)
+        # for second part add 255 because it will be normalized later
+        
+        return state
+
+    
+    def _get_reward_task_1(self, pose):
+        """
+        This function calculates the reward.
+        """
+        x_pos = pose.position.x_val
+        y_pos = pose.position.y_val
+        z_pos = pose.position.z_val
+        
+        w_rot = pose.orientation.w_val
+        x_rot = pose.orientation.x_val
+        z_rot = pose.orientation.z_val
+
+        # calculate difference between current and goal
+        dif = 0
+        x_dif = math.sqrt((x_pos - self.x_pos_goal_1)**2)
+        y_dif = math.sqrt((y_pos - self.y_pos_goal_1)**2)
+        z_dif = math.sqrt((z_pos - self.z_pos_goal_1)**2)
+
+        w_r_dif = math.sqrt((w_rot - self.w_rot_goal_1)**2)
+        x_r_dif = math.sqrt((x_rot - self.x_rot_goal_1)**2)
+        z_r_dif = math.sqrt((z_rot - self.z_rot_goal_1)**2)
+        dif = x_dif + y_dif + z_dif + w_r_dif + x_r_dif + z_r_dif
+        
+        print("Task 1",  dif)
+        print("Task 1 diff from goal x: {0:.2f} y: {0:.2f} z: {0:.2f}  w: {0:.2f}  x: {0:.2f}  z: {0:.2f}".format(x_dif, y_dif, z_dif, w_r_dif, x_r_dif, z_r_dif))
+        print("Task 1 total x: {0:.2f} y: {0:.2f} z: {0:.2f}  w: {0:.2f}  x: {0:.2f}  z: {0:.2f}".format(x_pos, y_pos, z_pos, w_rot, x_rot, z_rot))
+        
+        reward = -dif
+        if dif < 3:
+            reward = 0.7**abs(dif)
+        if dif < 0.2:
+            print("task one complete")
+            self.task_one_complete = True
+        reward = max(reward, -1)
+        return reward 
+
+    def _get_reward_task_2(self, pose):
+        """
+        This function calculates the reward.
+        """
+        x_pos = pose.position.x_val
+        y_pos = pose.position.y_val
+        z_pos = pose.position.z_val
+        
+        x_rot = pose.orientation.x_val
+        y_rot = pose.orientation.y_val
+        z_rot = pose.orientation.z_val
+
+        # calculate difference between current and goal
+        dif = 0
+        x_dif = math.sqrt((x_pos - self.x_pos_goal_2)**2)
+        y_dif = math.sqrt((y_pos - self.y_pos_goal_2)**2)
+        z_dif = math.sqrt((z_pos - self.z_pos_goal_2)**2)
+
+        x_r_dif = math.sqrt((x_rot - self.x_rot_goal_2)**2)
+        y_r_dif = math.sqrt((y_rot - self.y_rot_goal_2)**2)
+        z_r_dif = math.sqrt((z_rot - self.z_rot_goal_2)**2)
+        dif = x_dif + y_dif + z_dif + x_r_dif + y_r_dif + z_r_dif
+        if y_dif >= 3:
+            reward = 0
+        else:
+            reward  = max(-dif, 0)
+        
+        if dif < 3:
+            reward = 0.7**abs(dif)
+        if dif < 0.3:
+            reward = 1
+
+        
+        return reward
+
+    def _get_state(self, camera):
+        """ if camera is 3 forward and 4 backward
+        """
+        # get back camera 
+        responses = self.client.simGetImages([airsim.ImageRequest(camera,
+            airsim.ImageType.DepthVis),
+            airsim.ImageRequest("3", airsim.ImageType.DepthPerspective, True), #depth in pe>
+            airsim.ImageRequest(camera, airsim.ImageType.Scene), #scene
+            airsim.ImageRequest(camera, airsim.ImageType.Scene, False, False)])
+        state_exists = False
+        for response in responses:
+            img1d = np.fromstring(response.image_data_uint8, dtype= np.uint8) # get numpy array
+            if img1d.shape[0] == 268800:
+                state_exists = True
+                state= img1d.reshape(response.height, response.width, 3) # reshape array to 3 channel image
+                #print("state", state)
+                #img = Image.fromarray(state, 'RGB')
+                #text = 'my-{}.png'.format(self.count)
+                #self.count +=1
+                #img.save(text)
+
+        if state_exists == False:
+            print("false state")
+            state = np.zeros((3, self.height, self.width))
+            print(state.shape)
+        return state
