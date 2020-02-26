@@ -12,14 +12,44 @@ from model import DQN
 from agent import Agent
 from test import test, _plot_line
 import gym
-
+import sys
 import argparse
 import bz2
 import pickle
 import cv2
 from collections import deque
+import matplotlib.pyplot as plt
 from datetime import datetime
 import tqdm
+
+
+
+def load_memory(memory_path, disable_bzip):
+    if disable_bzip:
+        with open(memory_path, 'rb') as pickle_file:
+            return pickle.load(pickle_file)
+    else:
+        with bz2.open(memory_path, 'rb') as zipped_pickle_file:
+            return pickle.load(zipped_pickle_file)
+
+
+
+
+def save_and_plot(num_iterations, returns_average, model=1):
+    """
+    """
+    os.system('mkdir -p results/model-{}'.format(model))
+    fig, ax = plt.subplots()
+    iterations = range(0, len(returns_average))
+    ax.plot(iterations, returns_average,'b', label='average')
+    legend = ax.legend(loc='upper center', shadow=True, fontsize='x-large')
+    legend.get_frame().set_facecolor('C0')
+    plt.ylabel('Average Return')
+    plt.xlabel('Iterations')
+    #plt.ylim(top=25)
+    plt.savefig('results/model-1/scores-{}.png'.format(num_iterations))
+    print("plot saved")
+
 
 
 
@@ -44,7 +74,7 @@ def eval_policy(args, env):
         state_buffer.append(zeros)
         state_buffer.append(state)                        
         state = torch.stack(list(state_buffer),0)
-        for step in range(100):
+        for step in range(2):
             action = dqn.act_e_greedy(state, eps)  # Choose an action greedily (with noisy weights)
             next_state, reward, done, _ = env.step(action)
             print(reward)
@@ -63,24 +93,49 @@ def train(args, env):
     print("show action space", action_space)
     print("state space", env.observation_space)
     # Agent
-    dqn = Agent(args, env)
+    dqn_1 = Agent(args, env)
+    dqn_2 = Agent(args, env)
+    
+    results_dir = os.path.join('results', args.id)
+    print("result dir", results_dir)
+    
+    T, done = 0, True
     # If a model is provided, and evaluate is fale, presumably we want to resume, so try to load memory
-    if args.model is not None and not args.evaluate:
-        if not args.memory:
-            raise ValueError('Cannot resume training without memory save path. Aborting...')
-        elif not os.path.exists(args.memory):
-            raise ValueError('Could not find memory file at {path}. Aborting...'.format(path=args.memory))
-        mem = load_memory(args.memory, args.disable_bzip_memory)
+    print(" ags training", args.continue_training)
+    
+    args.continue_training = False
+    if args.continue_training:
+        print("Continue Training Load buffer 1 ...")
+        
+        args.memory = results_dir + "/val_mem_1/memory.pkl"
+        mem_1 = load_memory(args.memory, args.disable_bzip_memory)
+        val_mem_1 = ReplayMemory(args, args.evaluation_size)
+        print("loaded memory buffer 1")
+        print("Continue Training Load buffer 2 ...")
+        args.memory = results_dir + "/val_mem_2/memory.pkl"
+        mem_2 = load_memory(args.memory, args.disable_bzip_memory)
+        val_mem_2 = ReplayMemory(args, args.evaluation_size)
+        print("loaded memory buffer 2")
+    
     else:
-        mem = ReplayMemory(args, args.memory_capacity)
+        print("use empty Buffers")
+        args.memory = results_dir + "/val_mem_1/memory.pkl"
+        path = results_dir + "/val_mem_1"
+        print("save memory", args.memory)
+        os.makedirs(path, exist_ok=True)
+        val_mem_1 = ReplayMemory(args, args.evaluation_size)
+        mem_1 = ReplayMemory(args, args.memory_capacity)
+        args.memory = results_dir + "/val_mem_2/memory.pkl"
+        path = results_dir + "/val_mem_2"
+        print("save memory", args.memory)
+        os.makedirs(path, exist_ok=True)
+        val_mem_2 = ReplayMemory(args, args.evaluation_size)
+        mem_2 = ReplayMemory(args, args.memory_capacity)
     
     priority_weight_increase = (1 - args.priority_weight) / (args.T_max - args.learn_start)
     metrics = {'steps': [], 'rewards': [], 'Qs': [], 'step_rewards': [], 'train_rewards': [] , 'best_avg_reward': -float('inf')}
-    results_dir = os.path.join('results', args.id)
-    print("result dir", results_dir)
-    args.memory = results_dir + "/memory.pkl"
-    print("save memory", args.memory)
     
+    args.continue_training = True
     def write_into_file(text, file_name='document.csv'):
         """
         """
@@ -106,65 +161,20 @@ def train(args, env):
     
     ("Create eval memory of size {} ".format(args.evaluation_size))
     # Construct validation memory
-    val_mem = ReplayMemory(args, args.evaluation_size)
-    T, done = 0, True
+    
     size = 84
     print("Fill eval memory")
-    while T < args.evaluation_size:
-        T += 1
-        print("steps ", T)
-        if done:
-            t = 0
-            done = False
-            state = env.reset()
-            state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
-            zeros = torch.zeros_like(state)
-            state_buffer = deque([], maxlen=args.history_length)
-            state_buffer.append(zeros)
-            state_buffer.append(zeros)
-            state_buffer.append(zeros)
-            state_buffer.append(state)                        
-            state = torch.stack(list(state_buffer),0)
-        t += 1
-        if t == 50:
-            t = 0
-            done = True
-        next_state, _, _ ,_= env.step(np.random.randint(0, action_space))
-        
-        val_mem.append(state, None, None, done)
-        next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
-        state_buffer.append(next_state)
-        state = torch.stack(list(state_buffer), 0)
-    eps = 1
-    eps_end = 0.05
-    eps_decay = 0.999996
-    #args.evaluate = True
-    if args.evaluate:
-        print("Test")
-        dqn.eval()  # Set DQN (online network) to evaluation mode
-        #avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, env, evaluate=True)  # Test
-        avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir, env)  # Test
-        print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-    else:
-        # Training loop
-        dqn.train()
-        T, done = 0, True
-        episode = 0
-        episode_reward = 0
-        mean_reward = deque(maxlen=100)
-        for T in tqdm.trange(0, args.T_max + 1):
-            if T % args.max_episode_length == 0:
-                print("Epiosde: {}  Reward: {} ".format(episode, episode_reward))
-                mean_reward.append(episode_reward)
-                print("Episode {}  reward mean {}  ".format(episode,
-                    np.mean(mean_reward)))
-                #_plot_line(metrics['step_rewards'], metrics['train_rewards'], 'Reward', path=results_dir)
-
-                episode_reward = 0
-                episode += 1
-                state, done = env.reset(), False
-                
-                
+    
+    # fill both memories at same time 
+    # use the reward function for each
+    try: 
+        while T < args.evaluation_size:
+            T += 1
+            print("steps ", T)
+            if done:
+                t = 0
+                done = False
+                state = env.reset()
                 state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
                 zeros = torch.zeros_like(state)
                 state_buffer = deque([], maxlen=args.history_length)
@@ -172,60 +182,211 @@ def train(args, env):
                 state_buffer.append(zeros)
                 state_buffer.append(zeros)
                 state_buffer.append(state)                        
-                state = torch.stack(list(state_buffer), 0)
-            if T % args.replay_frequency == 0:
-                pass
-                #dqn.reset_noise()  # Draw a new set of noisy weights
-            #action = dqn.act(state)  # Choose an action greedily (with noisy weights)
-            action = dqn.act_e_greedy(state, eps)  # Choose an action greedily (with noisy weights)
-            #print("step : {} action: {} eps: {}".format(T, action, eps))
-            next_state, reward, done, _ = env.step(action)  # Step
-            
-            if args.reward_clip > 0:
-                reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
-            episode_reward += reward
-            
-            # incase the last action set done to True
-            if T + 1 % args.max_episode_length == 0:
+                state = torch.stack(list(state_buffer),0)
+            t += 1
+            if t == args.max_episode_length:
+            #if t == 5:
+                t = 0
                 done = True
+            next_state, _, _ ,_= env.step(np.random.randint(0, action_space))
             
-            mem.append(state, action, reward, done)  # Append transition to memory
-            # Train and test
+            val_mem_1.append(state, None, None, done)
+            val_mem_2.append(state, None, None, done)
             
             next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
-            #print("Main shape of  next_state", next_state.shape) 
             state_buffer.append(next_state)
             state = torch.stack(list(state_buffer), 0)
-            #print("Main shape of  state", state.shape) 
-            eps = max(eps_end, eps_decay*eps)
-            
-            
-            
-            # Train and test
-            if T >= args.learn_start:
-                mem.priority_weight = min(mem.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
+        eps_1 = 1
+        eps_end_1 = 0.05
+        eps_decay_1 = 0.999978   # reaches 10% at 105000
+        
+        eps_2 = 1
+        eps_end_2 = 0.05
+        eps_decay_2 = 0.999978   # reaches 10% at 10500
+        #args.evaluate = True
+        if args.evaluate:
+            print("Test")
+            dqn.eval()  # Set DQN (online network) to evaluation mode
+            #avg_reward, avg_Q = test(args, 0, dqn, val_mem, metrics, results_dir, env, evaluate=True)  # Test
+            avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir, env)  # Test
+            print('Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+        else:
+            if args.continue_training:
+                print("Start Training")
+                T = args.learn_start + 500
+            # Training loop
+            dqn_1.train()
+            dqn_2.train()
+            episode = 0
+            episode_reward = 0
+            mean_reward = deque(maxlen=100)
+            plot_rewards = []
+            print("Fill both memory buffers ")
+            while T < args.learn_start:
+                if T % args.max_episode_length == 0:
+                    state, done = env.reset(), False 
+                    state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
+                    zeros = torch.zeros_like(state)
+                    state_buffer = deque([], maxlen=args.history_length)
+                    state_buffer.append(zeros)
+                    state_buffer.append(zeros)
+                    state_buffer.append(zeros)
+                    state_buffer.append(state)                        
+                    state = torch.stack(list(state_buffer), 0)
+                # choose action at random
+                action = np.random.randint(0, action_space) 
+                next_state, reward, done, reward_2 = env.step(action)  # Step
+                text = "Step {} of {} ".format(T, args.learn_start)
+                print(text,  end='\r', file=sys.stdout, flush=True)
+                # set done on the last transition
+                if (T+1) % args.max_episode_length == 0:
+                    done = True
+                mem_1.append(state, action, reward, done)
+                mem_2.append(state, action, reward_2, done)
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
+                state_buffer.append(next_state)
+                state = torch.stack(list(state_buffer), 0)
+                T +=1
+                if T >= args.learn_start:
+                    args.memory = results_dir + "/val_mem_1/memory.pkl"
+                    print("save memory 1", args.memory)
+                    save_memory(mem_1, args.memory, args.disable_bzip_memory)
+                    args.memory = results_dir + "/val_mem_2/memory.pkl"
+                    print("save memory 2", args.memory)
+                    save_memory(mem_2, args.memory, args.disable_bzip_memory)
+                    break
+            print("Start Training")
+            #for T in tqdm.trange(args.learn_start, args.T_max + 1):
+            for T in tqdm.trange(0, args.T_max + 1):
+                if T % args.max_episode_length == 0:
+                    mean_reward.append(episode_reward)
+                    print("Epiosde: {}  Reward: {} Mean Reward: {}  Goal1 {}".format(episode,
+                        episode_reward, np.mean(mean_reward), env.goal_counter_1))
+                    plot_rewards.append(np.mean(mean_reward))
+                    save_and_plot(T, plot_rewards)
+                    episode_reward = 0
+                    episode += 1
+                    state, done = env.reset(), False 
+                    state = torch.tensor(state, dtype=torch.float32, device=args.device).div_(255)
+                    zeros = torch.zeros_like(state)
+                    state_buffer = deque([], maxlen=args.history_length)
+                    state_buffer.append(zeros)
+                    state_buffer.append(zeros)
+                    state_buffer.append(zeros)
+                    state_buffer.append(state)                        
+                    state = torch.stack(list(state_buffer), 0)
+                    g = 0
+                    set_input = True
+                    secondTask = False
+                
+                
                 if T % args.replay_frequency == 0:
-                    dqn.learn(mem)  # Train with n-step distributional double-Q learning
+                    pass
+                    #dqn.reset_noise()  # Draw a new set of noisy weights
+                
+                
+                """
+                if env.task_one_complete or secondTask:
+                    action = dqn_2.act_e_greedy(state, eps_2)  # Choose an action greedily (with noisy weights)
+                    secondTask = True
+                else:
+                    action = dqn_1.act_e_greedy(state, eps_1)  # Choose an action greedily (with noisy weights)
+                """
+                if set_input:
+                    set_input = False
+                    g = input("Enter action : ") 
+                    action = int(g)
+                    g = input("Enter steps : ") 
+                    g = int(g)
+                if g <= 0:
+                    set_input = True
+                g -=1
+                
+                #print("step : {} action: {} eps: {}".format(T, action, eps))
+                next_state, reward, done, reward_2 = env.step(action)  # Step
+                
+                if args.reward_clip > 0:
+                    reward = max(min(reward, args.reward_clip), -args.reward_clip)  # Clip rewards
+                    reward_2 = max(min(reward_2, args.reward_clip), -args.reward_clip)  # Clip rewards
+                         
+                if env.task_one_complete or secondTask:
+                    episode_reward += reward_2
+                    eps_2 = max(eps_end_2, eps_decay_2*eps_2)
+                    mem_2.priority_weight = min(mem_2.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
+                else:
+                    episode_reward += reward
+                    eps_1 = max(eps_end_1, eps_decay_1*eps_1)
+                    mem_1.priority_weight = min(mem_1.priority_weight + priority_weight_increase, 1)  # Anneal importance sampling weight β to 1
+
+                #print(reward)
+                #print(reward_2)
+                # incase the last action set done to True
+                if T + 1 % args.max_episode_length == 0:
+                    done = True
+                
+                mem_1.append(state, action, reward, done)  # Append transition to memory
+                mem_2.append(state, action, reward_2, done)  # Append transition to memory
+                
+                # Train and test
+                 
+                next_state = torch.tensor(next_state, dtype=torch.float32, device=args.device).div_(255)
+                # print("Main shape of  next_state", next_state.shape) 
+                state_buffer.append(next_state)
+                state = torch.stack(list(state_buffer), 0)
+                continue
+                # print("Main shape of  state", state.shape) 
+                if T % args.replay_frequency == 0:
+                    dqn_1.learn(mem_1)  # Train with n-step distributional double-Q learning
+                    dqn_2.learn(mem_2)  # Train with n-step distributional double-Q learning
+                
                 if T % args.evaluation_interval == 0:
-                    dqn.eval()  # Set DQN (online network) to evaluation mode
-                    print("epsilon", eps)
-                
-                    avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir, env)  # Test
+                    dqn_1.eval()  # Set DQN (online network) to evaluation mode
+                    print("Eval epsilon 1 {} epsilon 2 {} ".format(eps_1,eps_2))
+                    avg_reward, avg_Q = test(args, T, dqn_1, val_mem_1, metrics, results_dir, env, 1)  # Test
                     log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-                    dqn.train()  # Set DQN (online network) back to training mode
-                
+                    dqn_1.train()  # Set DQN (online network) back to training mode
+                    dqn_2.eval()  # Set DQN (online network) to evaluation mode
+                    avg_reward, avg_Q = test(args, T, dqn_2, val_mem_2, metrics, results_dir, env, 2)  # Test
+                    log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(avg_reward) + ' | Avg. Q: ' + str(avg_Q))
+                    dqn_2.train()  # Set DQN (online network) back to training mode
+                    
+                    
                 # Update target network
                 if T % args.target_update == 0:
-                    dqn.update_target_net()
-    
+                    dqn_1.update_target_net()
+                    dqn_2.update_target_net()
+        
                 # checkpoint the network
                 if (args.checkpoint_interval != 0) and (T % args.checkpoint_interval == 0):
                     #print("save memory", args.memory)
                     #save_memory(mem, args.memory, args.disable_bzip_memory)
-                    print("epsilon", eps)
+                    print("epsilon 1: ", eps_1)
+                    print("epsilon 2: ", eps_2)
                     print("Save model at ", results_dir)
-                    dqn.save(results_dir, '{}-checkpoint.pth'.format(T))
-    
+                    dqn_1.save(results_dir, '{}-checkpoint.pth'.format(T))
+                    dqn_2.save(results_dir, '{}-2-checkpoint.pth'.format(T))
+    except KeyboardInterrupt:
+        print("Keybaord error")
+    finally:
+        print("save state....")
+        print("Save model at ", results_dir)
+        dqn_1.save(results_dir, '{}-checkpoint.pth'.format(T))
+        dqn_2.save(results_dir, '{}-2-checkpoint.pth'.format(T))
+        args.memory = results_dir + "/val_mem_1/memory.pkl"
+        print("save memory 1  ...", args.memory)
+        save_memory(mem_1, args.memory, args.disable_bzip_memory)
+        args.memory = results_dir + "/val_mem_2/memory.pkl"
+        print("save memory 2 ...", args.memory)
+        save_memory(mem_2, args.memory, args.disable_bzip_memory)
+        print("Save model at ", results_dir)
+        dqn_1.save(results_dir, '{}-checkpoint.pth'.format(T))
+        dqn_2.save(results_dir, '{}-2-checkpoint.pth'.format(T))
+        print("... done Saving State")
+        sys.exit()
+
+
+
+
 
 if __name__ == "__main__":
     print("Main")
@@ -235,7 +396,7 @@ if __name__ == "__main__":
     parser.add_argument('--disable-cuda', action='store_true', help='Disable CUDA')
     parser.add_argument('--T-max', type=int, default=int(50e6), metavar='STEPS',
             help='Number of training steps (4x number of frames)')
-    parser.add_argument('--max-episode-length', type=int, default=int(50), metavar='LENGTH', help='Max episode length in game frames (0 to disable)')
+    parser.add_argument('--max-episode-length', type=int, default=int(100), metavar='LENGTH', help='Max episode length in game frames (0 to disable)')
     parser.add_argument('--history-length', type=int, default=4, metavar='T',
             help='Number of consecutive states processed')
     parser.add_argument('--architecture', type=str, default='canonical', choices=['canonical', 'data-efficient'], metavar='ARCH', help='Network architecture')
@@ -264,7 +425,7 @@ if __name__ == "__main__":
     parser.add_argument('--learn-start', type=int, default=int(2000),
             metavar='STEPS', help='Number of steps before starting training')
     parser.add_argument('--evaluate', action='store_true', help='Evaluate only')
-    parser.add_argument('--evaluation-interval', type=int, default=3000,
+    parser.add_argument('--evaluation-interval', type=int, default=10000,
             metavar='STEPS', help='Number of training steps between evaluations')
     parser.add_argument('--evaluation-episodes', type=int, default=2, metavar='N',
             help='Number of evaluation episodes to average over')
@@ -276,9 +437,10 @@ if __name__ == "__main__":
     parser.add_argument('--memory', help='Path to save/load the memory from')
     parser.add_argument('--disable-bzip-memory', action='store_true', help='Don\'t zip the memory file. Not recommended (zipping is a bit slower and much, much smaller)')
     parser.add_argument('--device', type=str, default='cpu')
+    parser.add_argument('--continue-training', type=bool, default='False')
     # Setup
     args = parser.parse_args()
     env = gym.make('Car-v0')
-
+    
     #eval_policy(args, env)
     train(args, env)
