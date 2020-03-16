@@ -1,0 +1,26 @@
+
+
+
+
+
+
+Hello My name is Christian Leininger and I am going to present you you the Video
+Action Transformer a work Girdhar el al.
+
+The objective of this work is to localize all humans and their associated action in video clips
+
+To achive this the author propose this model called "Video action transformer",
+which takes a raw pixel image as input.
+
+
+One reason why inferring the actions of the person is 
+challaneging. is that the model needs to  able to
+capture the information over time (temporal). 
+Example action are "watching a person ", "listen to a person", "pointing to an
+object" and many more. 
+So far RNN have been used for this task. Professor Ronneberger already explained
+in the lecture before Chrismas that one issue of this method is that the
+information needs to be processd sequenicely which increase the compute time
+
+
+The video action transformer
