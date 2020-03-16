@@ -28,7 +28,12 @@ sequence is too long. Like it your case. To overcame this issue the authors
 propose this Video Action Transformer architecure that uses a techique called attention.
 This is inspiered by the The Transformer architecture from Vaswani et al. which
 has been successful apllied to  sequence modelling tasks like language
-translation. 
+translation. The attention method I will explain later in more detail, but one
+drawback is that the compute cost for the basic attention method is O(n2) where
+n is the amout of pixel of the inputImage. A major contribution of this work is
+that the Video Action Transformer does not requiere so much computational time
+
+
 
 
 The video action transformer
