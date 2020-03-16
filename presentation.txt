@@ -83,26 +83,47 @@ For the
 30.Slide Action classication 
 
 
-In this table the comparsion between  the action classication of the different
+In this table we compare the action classication perscent  of different model
 configuration.
 
-In the 2 first rows we have the I3D as a  trunk and Head  we can opserve that the
-param stays the same so does the compuation cost. But with the Val mAP is around
-2 perscent better with ground truelabels.
+In the 2 first rows we have the I3D as a trunk and Head  .
+We can opserve that the param stays the same so does the compuation cost like we
+would accpect since we only turn the ground truelabels on and off. 
+
+But  ground truelabels help the model to get a 2 % better Val mAP.
 Which indicates that the RPN propels are not perfect.
 
-In the bottem 4 rows the Head is replaced with the action Transformer Head.
-also the performence with Low resolutions queries and high resolutions
-resolutions is compared. 
+In the bottem 4 rows the Head is replaced with the proposed Action Transformer Head.
+They also compared the performence with Low resolutions and high resolutions
+resolutions queries.
 
-In the coluom for the model parameter the high resolutions increase by 0.74 
-which leades  to a higher compute cost of TODO
-While without GT boxes the mAP stays with  18 and 19 % lower than the I3D head 
-with GT boxes the mAP is with 29 % for low resolutions and 27.6% better.
+
+In the coluom for the model parameter we see that the higher  queries resolution
+increase the parameters  which leades  to a higher compute cost but not
+linearaly.
+
+How does this affect our performence?
+
+While without GT boxes the mAP stays with  18 or 19 % lower than  with the I3D head 
+the performence with GT boxes is with 29 %  for low resolution and for high
+resolution 27.6% better.
+
+TODO: what could be the reson of this?
+
+
 
 This indicates that the Transformer head depends on good box propels for good action
 classication. Since could come from that the action Transformer attents to this
 region.
+
+
+
+
+
+
+
+
+
 
 
 
