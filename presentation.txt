@@ -15,12 +15,20 @@ which takes a raw pixel image as input.
 
 One reason why inferring the actions of the person is 
 challaneging. is that the model needs to  able to
-capture the information over time (temporal). 
+capture the information over time (temporal) and contextual information (other
+people, other objects). 
 Example action are "watching a person ", "listen to a person", "pointing to an
 object" and many more. 
 So far RNN have been used for this task. Professor Ronneberger already explained
 in the lecture before Chrismas that one issue of this method is that the
-information needs to be processd sequenicely which increase the compute time
+information needs to be processd sequenicely which increase the compute time.
+The serious issue is that in the RNN method the information collected over time
+is saved in one vector. This leads to to information lost when the input
+sequence is too long. Like it your case. To overcame this issue the authors
+propose this Video Action Transformer architecure that uses a techique called attention.
+This is inspiered by the The Transformer architecture from Vaswani et al. which
+has been successful apllied to  sequence modelling tasks like language
+translation. 
 
 
 The video action transformer
