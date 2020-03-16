@@ -35,5 +35,75 @@ that the Video Action Transformer does not requiere so much computational time
 
 
 
+3.Slide Image 
+
+
+This Image is from the original paper and should illustrate what the model is
+learning. 
+
+On the right Image is demonstarted how the output of the model looks like.
+We can see that the model creates an bounding box for each person it is
+reconizing and what is the action with the highest probabilty azosatied to this
+person.
+
+
+In the bottom left image it is illustradet the area where the model is
+attenting to the heands and faces.
+
+
+
+
+
+
+
+
+
+
+27.Slide 
+
+Now are we coming to the part where we are going t evaluate the model the autor
+used the Atomic Visual Actions (AVA) dataset
+
+this dataset conists of 211 thousend training clips 57 thousend for valdiation
+and 117 thousend for testing each clip is 15 minits long TODO ?
+
+For the center frame the labels are bounding boxes for the persons and the
+action of that person. 
+
+
+For the 
+
+
+
+
+
+
+
+
+30.Slide Action classication 
+
+
+In this table the comparsion between  the action classication of the different
+configuration.
+
+In the 2 first rows we have the I3D as a  trunk and Head  we can opserve that the
+param stays the same so does the compuation cost. But with the Val mAP is around
+2 perscent better with ground truelabels.
+Which indicates that the RPN propels are not perfect.
+
+In the bottem 4 rows the Head is replaced with the action Transformer Head.
+also the performence with Low resolutions queries and high resolutions
+resolutions is compared. 
+
+In the coluom for the model parameter the high resolutions increase by 0.74 
+which leades  to a higher compute cost of TODO
+While without GT boxes the mAP stays with  18 and 19 % lower than the I3D head 
+with GT boxes the mAP is with 29 % for low resolutions and 27.6% better.
+
+This indicates that the Transformer head depends on good box propels for good action
+classication. Since could come from that the action Transformer attents to this
+region.
+
+
 
 The video action transformer
