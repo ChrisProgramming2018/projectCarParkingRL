@@ -1,0 +1,19 @@
+
+
+
+
+
+4.Experiments
+
+
+Two dinstict task: 1. action localization and 2. action classification
+
+
+Evaluate the model independendly on each task
+
+action classification replace the RPN proposals with the ground true labels
+
+assume perect classifiation by converting all class labels into a single one 
+to evaluate only the person localization performence.
+
+compare the model with other state of the art models
