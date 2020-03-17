@@ -59,10 +59,11 @@ attenting to the heands and faces.
 
 
 
-27.Slide 
+27.Slide Expriments
 
-Now are we coming to the part where we are going t evaluate the model the autor
-used the Atomic Visual Actions (AVA) dataset
+Now we are going to evaluate the model.
+The dataset he autor used  is the Atomic Visual Actions (AVA) dataset.
+
 
 this dataset conists of 211 thousend training clips 57 thousend for valdiation
 and 117 thousend for testing each clip is 15 minits long TODO ?
@@ -80,41 +81,115 @@ For the
 
 
 
-30.Slide Action classication 
+30.Slide Action classication with and without GT box
 
+To isolate the classification task from the localization task
+we compare the first case the action classication with and
+without groundtrue boxes for different model configurations.
+The results are messuerd with 64 proposal of the RPN.
 
-In this table we compare the action classication perscent  of different model
-configuration.
 
 In the 2 first rows we have the I3D as a trunk and Head  .
-We can opserve that the param stays the same so does the compuation cost like we
-would accpect since we only turn the ground truelabels on and off. 
+We can opserve that the param stays the same as  compuation cost like we
+would accpect since we only turn the groundtrue labels on and off. 
 
-But  ground truelabels help the model to get a 2 % better Val mAP.
-Which indicates that the RPN propels are not perfect.
-
-In the bottem 4 rows the Head is replaced with the proposed Action Transformer Head.
-They also compared the performence with Low resolutions and high resolutions
-resolutions queries.
+But  ground truelabels help the model to get a 2 % better mAP on the validation set.
+Which indicates that the RPN propels are not perfect and correct bounding boxes
+help the I3D head improve the action classication.
 
 
-In the coluom for the model parameter we see that the higher  queries resolution
-increase the parameters  which leades  to a higher compute cost but not
+In the last 4 bottom rows the Head is replaced with the proposed Action Transformer Head.
+They also compared the performence with Low resolutions and high resolutions queries.
+
+
+In the coluom for the model parameter we see that the higher queries resolution
+increase the parameters  which leades to a higher compute cost but not
 linearaly.
 
 How does this affect our performence?
 
 While without GT boxes the mAP stays with  18 or 19 % lower than  with the I3D head 
-the performence with GT boxes is with 29 %  for low resolution and for high
+the performence with GT boxes is with 29 % for low resolution and for high
 resolution 27.6% better.
+
+An explanation for this could be the RPN proposals are not as good as the ground
+true. Since the action transformer uses this areas to extrat the data for this keys and values.
 
 TODO: what could be the reson of this?
 
 
+31. Slide Case 2 localization performence
 
-This indicates that the Transformer head depends on good box propels for good action
-classication. Since could come from that the action Transformer attents to this
-region.
+
+here we have the second case we evaluate the action transformer head
+localization performence compared to the I3D head. 
+As we can see the I3D has a higher accurency in both cases
+which leads from his global perspective. 
+When comparing the low resolution and high query preprocessor the action
+transformer head has a significant better performence when using the high
+resolutions quiers.
+
+
+
+
+
+
+32. Performence deppending on numbers of head and layers 
+
+Now we evaluate the performence of the action transformer by varing the amount
+of layers and heads. This values are obtained by using groundtrue box as proposal.
+Those indicate the performence increase by more layers and using less heads.
+
+TODO what could be the reason for this?
+
+
+
+33. Compare to state of the Art
+
+
+In this table the proposed Video Action Transformer is compared to other state
+of the art models 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
