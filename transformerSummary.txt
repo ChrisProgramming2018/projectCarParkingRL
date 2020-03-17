@@ -1,0 +1,25 @@
+
+
+
+3. Action Transformer Network
+
+detect all persons and classify all actions in keyframe
+
+head and trunk similar to Faster R-CNN object detection
+
+base (trunk) uses 3D convolutional to genrate features and region proposals for
+the people in the Image.
+
+Head uses the feature associated with each proposal to regress a tighter
+bounding box and action.
+
+The RPN and bounding box regress are action agnostic.
+
+
+
+
+
+3.1 Base (trunk) network architecture
+
+The input of the a T-frame is extracted of the clip usally 64 
+which encodes 3 s around the keyframe.
