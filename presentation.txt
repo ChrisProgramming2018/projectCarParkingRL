@@ -13,7 +13,7 @@ To achive this the author propose this model called "Video action transformer",
 which takes a raw pixel image as input.
 
 
-One reason why inferring the actions of the person is 
+One reason why inferring the actions of persons in video clips  is 
 challaneging. is that the model needs to  able to
 capture the information over time (temporal) and contextual information (other
 people, other objects). 
@@ -49,6 +49,61 @@ person.
 
 In the bottom left image it is illustradet the area where the model is
 attenting to the heands and faces.
+
+
+
+
+
+
+
+5. Model overview
+
+
+This is the model overview of the proposed Video Action Transformer Network.
+First I will give brief overview and then I will explain every part in detail
+We can see the data flows from left to right. On the left we can see the model
+takes a video clip as input passed through the trunk. Where a pretrained CNN 
+generate a feature map. A Region Proposal Network uses the center frame to
+generate  multiple potential person bounding boxes as an Input for the head .
+The intuition behind the Action Transformer is that will use the context an
+vector with a probably for each action class and and make a tighter bounding box
+for each person. Here N are the number of different action classes and plus 1 
+respresents the backround
+
+
+7. Trunk Region 
+
+
+The video input clip is Transformt in a so called T Frame that encodes around 3
+seconds of the keyframe. The shape of the Input is TxHxW where H and W are
+height and Wight of an Image and T is the amount of Images stacked which is
+typcilaly 64. This is a hyperparameter needs to be selected. Later in the reults
+we will see how this will change the performence of the model.
+
+The Trunk of the model is a CNN pretrained on the kinetics-400 dataset. Which
+enables it to exrat features from the
+
+
+
+
+
+
+
+
+
+
+14.
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -153,12 +208,68 @@ of the art models
 
 
 
+34. Correlation of  performence with training data size
+
+
+In this graph we can see the Correlation between the training data size and the
+mAp of the network.
+
+The green line indicates the training size and it grows from left to right and
+from the smallest set from around 500 samples with people pointing to an
+object. to over 200.000 samples of people just standing.
+The blue and red bars are an comparison between using the I3D as a head and the
+action transformer as a head
+The blue bars are represent the mAP performence in case of the I3D  and red is
+for the action transformer. 
+
+It seems that a lot of action benefit of more data but also a some  like
+touching an object or smoke have still a poor performence compare to other tasks.
+
+The swimming task are prediced quite well with less data probably because the
+model learns if there is water (so the most of the image is blue) it means the
+action is swimming .
+
+Its also a good example where the action transformer head is supiror then the I3D head
+also drving, smoking,  hand claps and other action are benfit from that the
+action transformer attent to the hands and head of a person.
+
+TODO: kissing is worse even it has 
 
 
 
 
 
 
+
+35 Examples of Correct Predictions 
+
+The autors present in their work this images where the model was able to
+predict the action and person correctly. There are 3 Image each for the task
+holding  an object, fight and watch a person. In all of them the model needs to
+reason about the surounding of the person and over time 
+
+
+
+36 Example of Incorrect Predictions 
+
+
+We saw earlier that the model is performening poorly on reconizing smoking
+people which is not a trival task. Here we can see why.
+
+In the first picture a men is eaten something so he puts his hand to his mouth,
+which causes the network to predict him as smoking even he is not.
+
+Secend Picture the false person is marked as smoking 
+
+
+Third TODO?
+
+
+In the bottom left Image the person is actually singing , the model is triggered
+because he has a microphone in front of his mouth 
+
+A particualar interessing one is this guy how is smoking in front of a mirrow 
+so the model is 
 
 
 
