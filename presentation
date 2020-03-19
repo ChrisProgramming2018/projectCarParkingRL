@@ -123,7 +123,7 @@ optimal combination of heads.
 
 
 ___________________________More Detailed version _______________________________
-
+(based on the section 3.4 Implementation Details
 
 13. I3D base highlighted 
 
@@ -133,6 +133,31 @@ recoginze object in a Image. This Operation will Downsample our Input tensor.
 
 
 14. Convolution feature is highlighted
+
+The Input of size 64x400x400 will result in a Convolutional feature map of size
+16x25x25. This blue cube repesents context frames around the key frame which is
+highlighted in yellow.
+
+
+
+They take the center of the feature map and add a location embedding. This
+allows the model to encode spatiotemporal proximity. Which is importen without
+this this proberty would have been lost when we removed the RNN from the model.
+
+
+15. RPN 
+
+This key frame embedding of the feature map will be the query from the
+attention. It will be passed trough a region proposal network which will
+generate box proposal for the people in side the key frame. How many of them 
+is a hyperparameter called R and is at default at 300. We will see later in the
+Expriments that by changing the amount it will increase or decrease the
+accurency of the model.
+
+16. Tx  Unit
+
+
+
 
 
 
