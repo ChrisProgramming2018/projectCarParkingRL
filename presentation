@@ -156,33 +156,55 @@ accurency of the model.
 
 16. Tx  Unit
 
+This represents the one  head of the Action Transformer a so called Tx Unit
+it has 3 has vecotor as Input  the  query , key and value.
+The query is passed througt ROIPool operation so all region proposal will have
+the same dimension of 7x7.
+
+They used 2 different Query preprocessort to compare the results.
+The first they called the High Resolution and low Resolution.
+The High Resolution preprocessor works as follows 
+
+
+To avoid the lost of  all spatial layout of the person the dont average the
+RoIpol feature across the space. Instead they use a 1x1 convolution to reduce
+the dimentions. The resut 
+
+
+Will the low resolution preprocessor average of the feature spatially and will
+lose this informaion the difference in the result we will see later in the
+results.
+
+
+The key and value feature tensor a linear projection of the feature map
+embeddings surounding the the key-frame.
+
+Each has a shape of is of shape 16 × 25 × 25 × D
 
 
 
+17. Tx Unit Softmax Attention highlighted
+
+There it ilustrated how the different Tensort are going to be processed 
+so we can see on the next slide how this will look mathematecly 
 
 
+18. Equation
+
+This is the main attenten equation which will be computed for each Region
+proposal small r sepertatly. The attenten is computed as a Sum over x,y,t 
+where x and y are represent the pixel in each image and since we have a T frame
+as input. T represent each image in this stack.
+
+We take big Q (which is the output of the Q )
+with the shape of 16 × 25 × 25 × D compute the dotproduct with the transposed
+Key features and Normilize with D which is 125.
+To get the shape of 16 × 25 × 25 × 1.On this we apply the  Softmax function 
+to get the probablities. Those we use as weights for the Value features.
+Before we add them back to our Querie we us a dropout as a regularization. 
+Here the dropout  probabilty  is set to 30%.
 
 
-
-
-
-
-
-
-14.Tx Unit 
-
-
-Here we can see that Tx Unit has two stream. The ROI Pooling extract  
-
-
-
-
-
-
-
-
-
-14.
 
 
 
