@@ -13,7 +13,7 @@ It is able to extract contextual Informatation without supervision.
 (there are no labels during the training phase)
 
 In order to outperform other state of the art approaches by a significant margin
-The Action Transformer Network uses an method called attention to over come the limitations
+The Action Transformer Network uses an method called self - attention to over come the limitations
 RNNs, which haven been used so far.
 
 
@@ -45,12 +45,12 @@ that the Video Action Transformer does not requiere so much computational time
 3.Slide Image 
 
 
-This Image is from the original paper and should illustrate what the model is
+Thoses Images are from the original paper and should illustrate what the model is
 learning. 
 
 On the right Image is demonstarted how the output of the model looks like.
-We can see that the model creates an bounding box for each person it is
-reconizing and what is the action with the highest probabilty azosatied to this
+We can see that the model creates an tight bounding box for each person it is
+reconizing and the action with the highest probabilty azosatied to this
 person.
 
 
@@ -68,25 +68,36 @@ it self.
 
 
 This Image shows an overview of the proposed Video Action Transformer Network.
-First I will give brief overview and then I will explain every part in detail
-We can see the data flows from left to right. On the left we can see the model
-takes a video clip as input passed through the trunk. Where a pretrained CNN 
-generate a feature map. A Region Proposal Network uses the center frame to
-generate  multiple potential person bounding boxes as an Input for the head .
-The intuition behind the Action Transformer is that will use the context an
-vector with a probably for each action class and and make a tighter bounding box
-for each person. Here N are the number of different action classes and plus 1 
-respresents the backround
+First I will give brief overview of the model and then I will explain every part
+in detail.
+
+
+The model consists of two parts the trunk and the head 
+(trunk is the left blue with the I3D base and the RPN  
+The head is right green part with the different Tx
+Heads which will generate the output of the network
+
+The data flows from left to right. On the left we can see the model
+takes a part of a video clip as input and passed through the trunk. Where a I3D
+a CNN  generates a feature map and the Region Proposal Network uses the center frame to
+generate  multiple potential person bounding boxes.
+The features maps and the bounding box proposals are the Input for the head.
+The intuition behind the attention method of the Action Transformer 
+is that  the person being classified is the QUERY and the key and value
+are the memory which extract information from the clip around the person.
+Which should help the model to inferre actions that are depending on other
+objects in the image or which requiere temporal reasoning.  
+
 
 ______________________________________________________________________________________________
 7. Trunk Region 
 
 
-The video input clip is Transformt in a so called T Frame that encodes around 3
-seconds of the keyframe. The shape of the Input is TxHxW where H and W are
+The video input clip is transformed in a so called T-Frame that encodes around 3
+seconds around the keyframe. The shape of the Input is TxHxW where H and W are
 height and Wight of an Image and T is the amount of Images stacked which is
-typcilaly 64. This is a hyperparameter needs to be selected. Later in the reults
-we will see how this will change the performence of the model.
+typcilaly 64. This is a hyperparameter needs to be selected. Laiter in the reults
+we will see how this will affect the performence of the model.
 
 8. I3D base  
 
