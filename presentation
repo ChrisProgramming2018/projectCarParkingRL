@@ -1,18 +1,20 @@
 
 
-Hello My name is Christian Leininger and I am going to present you the work from  Girdhar el al.
-its called the Video Action Transformer Network.
+Welcome  
+My name is Christian Leininger and I am going to present you the work from Girdhar el al.
+its called "Video Action Transformer Network".
 
-The objective of this work is to localize all humans and their associated action in a given  video clip.
+The objective of this work is to localize all humans and their associated action in a given video clip.
 
-To achive this the author proposed  a model  called " Action Transformer " which is
+To achive this the author proposed  a model called " Action Transformer " which is
 the main contribution of this work.
 
 It is able to extract contextual Informatation without supervision.
 (there are no labels during the training phase)
 
-This new model uses  an new method called attention to over come the limitations
-of the so far used RNNs
+In order to outperform other state of the art approaches by a significant margin
+The Action Transformer Network uses an method called attention to over come the limitations
+RNNs, which haven been used so far.
 
 
 
