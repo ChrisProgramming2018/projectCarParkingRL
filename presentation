@@ -7,7 +7,7 @@ its called "Video Action Transformer Network".
 The objective of this work is to localize all humans and their associated action in a given video clip.
 
 To achive this the author proposed  a model called " Action Transformer " which is
-the main contribution of this work.
+the main contribution of their work.
 
 It is able to extract contextual Informatation without supervision.
 (there are no labels during the training phase)
@@ -16,6 +16,10 @@ In order to outperform other state of the art approaches by a significant margin
 The Action Transformer Network uses an method called self - attention to over come the limitations
 RNNs, which haven been used so far.
 
+RNN limitations
+
+- input sequence to long ( reason is on vector not enoug to store all information)
+- need to compute in serieal no parallelization possible (input depends on the input before)
 
 
 Image:
@@ -87,6 +91,84 @@ is that  the person being classified is the QUERY and the key and value
 are the memory which extract information from the clip around the person.
 Which should help the model to inferre actions that are depending on other
 objects in the image or which requiere temporal reasoning.  
+
+
+
+5. Trunk region
+
+In this first ran I will give a more intutive eplaination what the networks does 
+
+Input is raw image pixek without flow estimation or sound like some other state of
+the art approaches are using. 
+
+
+6. I3D base network 
+
+Is Convolual Network the weights of layers are initalised from Networks that are
+trained to recognise Object so it is able to exctract a meaningfull feature map.
+
+7. RPN
+
+Generates Region proposals in which area could be a person present in this key
+frame. This is action agnoistic this reverse also for the boxding box
+regression.
+
+
+
+8. Head Region
+
+This is the second part of the network the head region. 
+Which is inspiered of the transformer architecture for sequence to sequence
+task.
+It uses also a the self attention method with query and key and value
+
+
+One part of input comes from the
+RPN. All of the different shape of the proposed bounding boxes need through the
+RoIPool layer to get same shape which is necessary for the Tx heads. 
+
+We can see the Tx Units can be stackt so we have multiple heads in multiple
+layers. There are 2 Heads in 3 different layers later at the evaluation part 
+how this will affect the accurency and see an ilustration what each of this
+heads is learning during the training phase
+
+
+Output. That the end the network will return vector (blue) which represents a
+probapilty for each action and its also contains the information for the person
+bounding box.
+
+This should give you the big picture overview how the model works
+
+
+
+9.Tx Unit
+
+
+Here we can see how in detail one head so called Tx Unit looks like
+
+- 3 parts query key and value 
+
+ - query is 
+
+ - query pre processor 2 different low and high 
+
+ - compute softmax attention 
+
+ - use value as weights to compute 
+  
+ - Dropout as regular 
+
+ - add the result back with the query 
+
+ - layer norm
+
+ - Fully conneteced layers again dropout 
+
+ - back together and layernorm (faster and easier train empirical results 
+
+ - It enables smoother gradients, faster training, and better generalization
+   accuracy ("Understanding and Improving Layer Normalization")
+
 
 
 ______________________________________________________________________________________________
@@ -239,20 +321,28 @@ Here the dropout  probabilty  is set to 30%.
 
 
 
-27.Slide Expriments
+25. Slide Expriments
 
 Now we are going to evaluate the model.
-The dataset he autor used  is the Atomic Visual Actions (AVA) dataset.
+The dataset the autors has chosen is the Atomic Visual Actions (AVA) dataset.
+
+This dataset conists of 211 thousend  clips for training 
+57 thousend for valdiation
+and 117 thousend clips for testing 
+
+each clip is 15 minits long  ?
+
+For the center frame the labels are given.
+Its the bounding boxes for the persons and for this person one or more of the 80
+different action classes.
+
+To evaluate the performence on 60 different actions which have at least 25
+validation exeamples. 
 
 
-this dataset conists of 211 thousend training clips 57 thousend for valdiation
-and 117 thousend for testing each clip is 15 minits long TODO ?
-
-For the center frame the labels are bounding boxes for the persons and the
-action of that person. 
 
 
-For the 
+As the metric they use the mean average precision at IOU threshold of 0.5
 
 
 
